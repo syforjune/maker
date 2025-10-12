@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>1Fメーカー</title>
+  <style>
+    .hidden {
+      display: none;
+    }
+    .keisan_form {
+      background: #eaf4ff;
+      padding: 10px 10px;
+      text-align: left;
+      display: flex;
+    }
+    .input-area {
+      width: 70%;
+      margin-right: 0; /* 右余白をなくす */
+    }
+    .result-area {
+      width: 35%;
+      margin-left: 0; /* 左余白をなくす */
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .calc-area {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        top: 20px;
+    }
+    .calc-area p {
+        margin-right: 10px;
+    }
+    form dl {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        align-items: flex-start;
+    }
+    form dl dt {
+      width: 70px;
+      height: 40px;
+      padding: 4px 0;   /* 10px → 4px に変更 */
+      line-height: 32px;/* 40px → 32px に変更 */
+      float: left;
+      clear: left;
+    }
+    form dl dd {
+      padding: 4px 0;   /* 10px → 4px に変更 */
+      margin: 0;
+      width: 70px;      /* 100px → 70px に変更 */
+      box-sizing: border-box;
+    }
+    .box {
+      width: 50% !important;
+      height: 40px !important;
+      margin: 0 !important;
+      padding: 0 6px !important; /* 10px → 6px に変更 */
+    }
+    .charname-box {
+      width: 100px;
+      height: 30px;
+      margin-bottom: 3px; /* 5px → 3px に変更 */
+      font-size: 1em;
+      box-sizing: border-box;
+      padding: 0 6px;   /* 8px → 6px に変更 */
+    }
+    .calc-btn {
+      width: 80px;
+      height: 30px;
+      border: 1px solid #333;
+    }
+    .calc-btn:hover {
+      cursor: pointer;
+    }
+    .result-box {
+      width: 100% !important;
+      height: 40px !important;
+      margin: 5px 0 !important;
+      padding: 0 10px !important;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .character-group {
+  width: 100%; /* 右端の余白をなくす */
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+    .character-group:last-child {
+        border-bottom: none;
+    }
+    .input-container {
+        display: flex;
+        align-items: center;
+        margin-right: 4px; /* 10px → 4px に変更 */
+    }
+    .input-container dt {
+        clear: none;
+    }
+    .result-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        width: 100%;
+        margin-top: 0px;
+    }
+    .result-list li {
+        margin-bottom: 5px;
+        display: flex;
+        align-items: center;
+    }
+    .result-list li label {
+        margin-right: 5px;
+        width: 100px;
+        text-align: right;
+        white-space: nowrap;
+    }
+    .stopwatch {
+      text-align: center;
+      margin-top: 8px; /* ここを20px→8pxに変更 */
+    }
+    .stopwatch-time {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+    .stopwatch-btn {
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+      margin: 0 5px;
+    }
+    .config-area {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #f7f7f7;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .config-label {
+      font-weight: bold;
+      margin-right: 5px;
+    }
+    .config-input {
+      width: 100px;
+      height: 30px;
+      font-size: 1em;
+      padding: 0 10px;
+      box-sizing: border-box;
+    }
+    .gakkari-btn, .isabiri-btn {
+      padding: 6px 16px;
+      font-size: 1em;
+      margin-left: 10px;
+      background: #eaf4ff;
+      border: 1px solid #333;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .gakkari-btn.active, .isabiri-btn.active {
+      background: #ffd700;
+      border-color: #bfa100;
+      color: #333;
+    }
+    .gakkari-btn:hover, .isabiri-btn:hover {
+      background: #d0e6fa;
+    }
+    .countdown {
+  display: inline-block;
+  width: 60px;
+  text-align: right;
+  font-size: 1.1em;
+  margin-right: 8px;
+  color: #0070c0;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+  </style>
+</head>
+<body>
+  <div class="config-area">
+    <span class="config-label">ステージ幅:</span>
+    <input type="number" id="stageLengthInput" class="config-input" value="3600" min="0">
+    <button type="button" class="gakkari-btn" id="gakkariBtn">がっかり用心棒</button>
+    <button type="button" class="isabiri-btn" id="isabiriBtn">いさびりヘッド / 逆襲のカオル君</button>
+  </div>
+  <div id="message1">
+    <form class="keisan_form" name="keisan_form">
+      <div class="input-area">
+        <dl>
+            <!-- キャラ名入力欄を追加 -->
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname1" value="キャラ①">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko1_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko1_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko1_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko1_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname2" value="キャラ②">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko2_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko2_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko2_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko2_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname3" value="キャラ③">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko3_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko3_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko3_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko3_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname4" value="キャラ④">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko4_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko4_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko4_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko4_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname5" value="キャラ⑤">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko5_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko5_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko5_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko5_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname6" value="キャラ⑥">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko6_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko6_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko6_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko6_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname7" value="キャラ⑦">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko7_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko7_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko7_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko7_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname8" value="キャラ⑧">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko8_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko8_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko8_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko8_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname9" value="キャラ⑨">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko9_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko9_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko9_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko9_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+            <div class="character-group">
+                <input type="text" class="charname-box" id="charname10" value="キャラ⑩">
+                <div class="input-container">
+                    <dt>射程</dt>
+                    <dd><input type="number" class="box" name="neko10_range" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>移動速度</dt>
+                    <dd><input type="number" class="box" name="neko10_speed" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>攻撃発生</dt>
+                    <dd><input type="number" class="box" name="neko10_attack" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+                <div class="input-container">
+                    <dt>コスト</dt>
+                    <dd><input type="number" class="box" name="neko10_cost" inputmode="numeric" pattern="[0-9]*" step="any"></dd>
+                </div>
+            </div>
+        </dl>
+      </div>
+      <div class="result-area">
+          <div class = "calc-area">
+            <p>手順</p>
+            <input type="button" class="calc-btn" onclick="calc()" value="計算">
+            <input type="button" class="calc-btn hidden" id="sortButton" onclick="sortResults()" value="昇順">
+            <input type="button" class="calc-btn hidden" id="resetButton" onclick="resetResults()" value="戻る">
+          </div>
+        <ul class="result-list" id="resultList">
+          <li>
+            <span class="countdown" id="countdown1">--</span>
+            <label for="description1" id="resultLabel1">キャラ①:</label>
+            <input id="description1" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown2">--</span>
+            <label for="description2" id="resultLabel2">キャラ②:</label>
+            <input id="description2" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown3">--</span>
+            <label for="description3" id="resultLabel3">キャラ③:</label>
+            <input id="description3" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown4">--</span>
+            <label for="description4" id="resultLabel4">キャラ④:</label>
+            <input id="description4" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown5">--</span>
+            <label for="description5" id="resultLabel5">キャラ⑤:</label>
+            <input id="description5" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown6">--</span>
+            <label for="description6" id="resultLabel6">キャラ⑥:</label>
+            <input id="description6" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown7">--</span>
+            <label for="description7" id="resultLabel7">キャラ⑦:</label>
+            <input id="description7" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown8">--</span>
+            <label for="description8" id="resultLabel8">キャラ⑧:</label>
+            <input id="description8" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown9">--</span>
+            <label for="description9" id="resultLabel9">キャラ⑨:</label>
+            <input id="description9" class="result-box" type="text" readonly=""/>
+          </li>
+          <li>
+            <span class="countdown" id="countdown10">--</span>
+            <label for="description10" id="resultLabel10">キャラ⑩:</label>
+            <input id="description10" class="result-box" type="text" readonly=""/>
+          </li>
+        </ul>
+        <!-- ストップウォッチをここに移動 -->
+        <div class="stopwatch">
+          <div class="stopwatch-time" id="stopwatchTime">00:00:00.00</div>
+          <button class="stopwatch-btn" id="startStopButton">開始</button>
+          <button class="stopwatch-btn" id="resetButton2">リセット</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div id="message2" class="hidden">条件2に合致すると表示されます。</div>
+<!-- 計算ボタンの下（calc-areaの直後）にグラフ用canvasを追加 -->
+<div style="margin: 16px 0;">
+  <canvas id="moneyChart" width="400" height="250"></canvas>
+</div>
+<script>
+    // 定数の定義
+    let STAGE_LENGTH = 3600;
+    const OFFSET = 1500;
+    const FRAME_RATE = 30;
+
+    let initialResults = [];
+
+    // STAGE_LENGTH入力ボックスの値変更で反映
+    const stageLengthInput = document.getElementById("stageLengthInput");
+    const gakkariBtn = document.getElementById("gakkariBtn");
+    const isabiriBtn = document.getElementById("isabiriBtn");
+
+    function updateStageButtonActive() {
+      gakkariBtn.classList.remove("active");
+      isabiriBtn.classList.remove("active");
+      if (Number(stageLengthInput.value) === 3600) {
+        gakkariBtn.classList.add("active");
+      } else if (Number(stageLengthInput.value) === 4000) {
+        isabiriBtn.classList.add("active");
+      }
+    }
+
+    stageLengthInput.addEventListener("input", function() {
+      STAGE_LENGTH = Number(stageLengthInput.value) || 0;
+      updateStageButtonActive();
+    });
+
+    gakkariBtn.addEventListener("click", function() {
+      STAGE_LENGTH = 3600;
+      stageLengthInput.value = 3600;
+      updateStageButtonActive();
+    });
+
+    isabiriBtn.addEventListener("click", function() {
+      STAGE_LENGTH = 4000;
+      stageLengthInput.value = 4000;
+      updateStageButtonActive();
+    });
+
+    // 初期表示時にボタン色を設定
+    window.addEventListener("DOMContentLoaded", updateStageButtonActive);
+
+    // キャラ名入力欄の値を計算結果ラベルに反映
+    function updateResultLabels() {
+  const defaultNames = ["キャラ①","キャラ②","キャラ③","キャラ④","キャラ⑤","キャラ⑥","キャラ⑦","キャラ⑧","キャラ⑨","キャラ⑩"];
+  for (let i = 1; i <= 10; i++) {
+    const charnameInput = document.getElementById(`charname${i}`);
+    const resultLabel = document.getElementById(`resultLabel${i}`);
+    const defaultName = defaultNames[i-1];
+    if (charnameInput && resultLabel) {
+      // フォーカスが外れている時だけ自動入力
+      if (!document.activeElement.isSameNode(charnameInput) && charnameInput.value.trim() === "") {
+        charnameInput.value = defaultName;
+      }
+      resultLabel.textContent = charnameInput.value + ":";
+    }
+  }
+}
+    // 入力欄のイベント設定
+    for (let i = 1; i <= 10; i++) {
+      const charnameInput = document.getElementById(`charname${i}`);
+      if (charnameInput) {
+        charnameInput.addEventListener("input", updateResultLabels);
+        charnameInput.addEventListener("blur", updateResultLabels); // フォーカスが外れた時
+      }
+    }
+    // 初期表示時にも反映
+    window.addEventListener("DOMContentLoaded", updateResultLabels);
+
+    let countdownValues = Array(10).fill(null);
+let countdownIntervals = Array(10).fill(null);
+
+function calc() {
+        const formData = document.forms.keisan_form;
+        const characterData = {};
+
+        for (let i = 1; i <= 10; i++) {
+            characterData[`neko${i}`] = {
+                range: formData[`neko${i}_range`].value,
+                speed: formData[`neko${i}_speed`].value,
+                attack: formData[`neko${i}_attack`].value
+            };
+        }
+
+        function calculateValue(range, speed, attack) {
+            if (!range || !speed || !attack || isNaN(range) || isNaN(speed) || isNaN(attack)) {
+                return NaN;
+            }
+            range = parseFloat(range);
+            speed = parseFloat(speed);
+            attack = parseFloat(attack);
+            return ((STAGE_LENGTH - OFFSET - range) / speed * 2 + attack) / FRAME_RATE;
+        }
+
+        const characterValues = {};
+        for (let i = 1; i <= 10; i++) {
+            characterValues[`neko${i}_value`] = calculateValue(
+                characterData[`neko${i}`].range,
+                characterData[`neko${i}`].speed,
+                characterData[`neko${i}`].attack
+            );
+        }
+
+        let validValues = [];
+        for (let i = 1; i <= 10; i++) {
+            if (!isNaN(characterValues[`neko${i}_value`])) {
+                validValues.push(characterValues[`neko${i}_value`]);
+            }
+        }
+
+        if (validValues.length === 0) {
+            alert("有効な数値を入力してください。");
+            return;
+        }
+
+        validValues.sort((a, b) => b - a);
+        const order1 = validValues[0];
+
+        const resultList = document.getElementById("resultList");
+        initialResults = [];
+
+        countdownValues = []; // 計算結果を格納
+        for (let i = 1; i <= 10; i++) {
+            const nekoValue = characterValues[`neko${i}_value`];
+            const descriptionId = `description${i}`;
+            const descriptionElement = document.getElementById(descriptionId);
+            const listItem = resultList.children[i - 1];
+            const countdownSpan = document.getElementById(`countdown${i}`);
+
+            let resultText = "";
+            let countdownNum = "--";
+            if (isNaN(nekoValue)) {
+                resultText = "入力エラー";
+            } else {
+                resultText = `最初のキャラ生産後 ${(order1 - nekoValue).toFixed(2)} 秒後`;
+                countdownNum = (order1 - nekoValue).toFixed(2);
+            }
+            descriptionElement.value = resultText;
+            listItem.setAttribute("value", isNaN(nekoValue) ? NaN : (order1 - nekoValue).toFixed(2));
+            countdownSpan.textContent = countdownNum;
+            countdownValues.push(isNaN(nekoValue) ? null : Number((order1 - nekoValue).toFixed(2)));
+            initialResults.push({
+                id: `li:nth-child(${i})`,
+                value: nekoValue,
+                html: listItem.outerHTML
+            });
+        }
+
+        // 計算ボタンが押されたら昇順ボタンを表示
+        document.getElementById("sortButton").classList.remove("hidden");
+        document.getElementById("resetButton").classList.add("hidden");
+        // グラフ描画
+        if (window.Chart) drawMoneyChart();
+        else chartScript.onload = drawMoneyChart;
+
+        // お金不足判定とメッセージ表示
+        setTimeout(() => {
+            const moneyChartWarning = document.getElementById("moneyChartWarning");
+            if (window.lastMoneyArray && window.lastMoneyArray.some(v => v < 0)) {
+                if (!moneyChartWarning) {
+                    const warningDiv = document.createElement("div");
+                    warningDiv.id = "moneyChartWarning";
+                    warningDiv.style.color = "red";
+                    warningDiv.style.fontWeight = "bold";
+                    warningDiv.style.margin = "12px 0";
+                    warningDiv.textContent = "お金不足のため不可能";
+                    const calcArea = document.querySelector(".calc-area");
+                    calcArea.parentNode.insertBefore(warningDiv, calcArea.nextSibling);
+                }
+            } else {
+                if (moneyChartWarning) moneyChartWarning.remove();
+            }
+
+            // 同時生産判定とメッセージ表示
+            const sameTimeWarning = document.getElementById("sameTimeWarning");
+            // countdownValuesの値ごとにキャラ名を集計
+            const valueToNames = {};
+            for (let i = 0; i < countdownValues.length; i++) {
+                const v = countdownValues[i];
+                if (typeof v === "number") {
+                    const key = v.toFixed(2); // 小数点2桁で比較
+                    if (!valueToNames[key]) valueToNames[key] = [];
+                    // キャラ名取得（未入力ならデフォルト名を使う）
+                    const charnameInput = document.getElementById(`charname${i+1}`);
+                    const defaultNames = ["キャラ①","キャラ②","キャラ③","キャラ④","キャラ⑤","キャラ⑥","キャラ⑦","キャラ⑧","キャラ⑨","キャラ⑩"];
+                    let charName = charnameInput && charnameInput.value.trim() !== "" ? charnameInput.value : defaultNames[i];
+                    valueToNames[key].push(charName);
+                }
+            }
+            // 2つ以上同じ値がある場合
+            const duplicatedNames = [];
+            Object.values(valueToNames).forEach(arr => {
+                if (arr.length > 1) duplicatedNames.push(...arr);
+            });
+            if (duplicatedNames.length > 0) {
+                if (!sameTimeWarning) {
+                    const warningDiv = document.createElement("div");
+                    warningDiv.id = "sameTimeWarning";
+                    warningDiv.style.color = "red";
+                    warningDiv.style.fontWeight = "bold";
+                    warningDiv.style.margin = "12px 0";
+                    warningDiv.textContent = `${duplicatedNames.join(",")}が同時生産のため不可能`;
+                    const calcArea = document.querySelector(".calc-area");
+                    // moneyChartWarningの下に挿入（なければcalcAreaの下）
+                    const moneyChartWarning = document.getElementById("moneyChartWarning");
+                    if (moneyChartWarning && moneyChartWarning.nextSibling) {
+                        moneyChartWarning.parentNode.insertBefore(warningDiv, moneyChartWarning.nextSibling);
+                    } else {
+                        calcArea.parentNode.insertBefore(warningDiv, calcArea.nextSibling);
+                    }
+                } else {
+                    sameTimeWarning.textContent = `${duplicatedNames.join(",")}が同時生産のため不可能`;
+                }
+            } else {
+                if (sameTimeWarning) sameTimeWarning.remove();
+            }
+        }, 100); // グラフ描画後に判定
+    }
+
+    function sortResults() {
+        const resultList = document.getElementById("resultList");
+        const sortButton = document.getElementById("sortButton");
+        const resetButton = document.getElementById("resetButton");
+
+        let resultsArray = Array.from(resultList.children);
+
+        resultsArray.sort((a, b) => {
+            const valueA = parseFloat(a.getAttribute("value"));
+            const valueB = parseFloat(b.getAttribute("value"));
+            if (isNaN(valueA) && isNaN(valueB)) return 0;
+            if (isNaN(valueA)) return 1;
+            if (isNaN(valueB)) return -1;
+            return valueA - valueB;
+        });
+
+        resultsArray.forEach(li => resultList.appendChild(li));
+        sortButton.classList.add("hidden");
+        resetButton.classList.remove("hidden");
+    }
+
+    function resetResults() {
+        const resultList = document.getElementById("resultList");
+        const sortButton = document.getElementById("sortButton");
+        const resetButton = document.getElementById("resetButton");
+
+        resultList.innerHTML = '';
+        initialResults.forEach(item => {
+            resultList.innerHTML += item.html;
+        });
+
+        sortButton.classList.remove("hidden");
+        resetButton.classList.add("hidden");
+        updateResultLabels();
+    }
+
+    // ストップウォッチのJavaScript
+    let stopwatchInterval;
+    let stopwatchStartTime = 0;
+    let stopwatchElapsed = 0;
+    let stopwatchRunning = false;
+    let countdownStartTime = null;
+
+    const stopwatchTime = document.getElementById("stopwatchTime");
+    const startStopButton = document.getElementById("startStopButton");
+    const resetButton2 = document.getElementById("resetButton2");
+
+    function updateStopwatch() {
+      const currentTime = Date.now();
+      let elapsedTime = stopwatchElapsed;
+      if (stopwatchRunning) {
+        elapsedTime += currentTime - stopwatchStartTime;
+      }
+
+      const totalSeconds = Math.floor(elapsedTime / 1000);
+      const centiseconds = Math.floor((elapsedTime % 1000) / 10);
+
+      const minutes = Math.floor(totalSeconds / 60);
+      const hours = Math.floor(minutes / 60);
+
+      const formattedHours = String(hours % 60).padStart(2, '0');
+      const formattedMinutes = String(minutes % 60).padStart(2, '0');
+      const formattedSeconds = String(totalSeconds % 60).padStart(2, '0');
+      const formattedCentiseconds = String(centiseconds).padStart(2, '0');
+
+      stopwatchTime.textContent = `${formattedHours}:${formattedMinutes}:${formattedSeconds}.${formattedCentiseconds}`;
+    }
+
+    function updateCountdownDisplays() {
+  if (!countdownStartTime) return;
+  for (let i = 0; i < 10; i++) {
+    const span = document.getElementById(`countdown${i+1}`);
+    if (countdownValues[i] !== null) {
+      let remain = countdownValues[i] - ((Date.now() - countdownStartTime) / 1000);
+      if (remain < 0) remain = 0;
+      span.textContent = remain.toFixed(2);
+    } else {
+      span.textContent = "--";
+    }
+  }
+}
+
+function resetCountdownDisplays() {
+  countdownStartTime = null;
+  for (let i = 0; i < 10; i++) {
+    const span = document.getElementById(`countdown${i+1}`);
+    if (countdownValues[i] !== null) {
+      span.textContent = countdownValues[i].toFixed(2);
+    } else {
+      span.textContent = "--";
+    }
+  }
+}
+
+// ページ更新（submit）を防止
+    startStopButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (stopwatchRunning) {
+        stopwatchElapsed += Date.now() - stopwatchStartTime;
+        clearInterval(stopwatchInterval);
+        clearInterval(window.countdownInterval);
+        startStopButton.textContent = "開始";
+        resetCountdownDisplays();
+      } else {
+        stopwatchStartTime = Date.now();
+        countdownStartTime = Date.now();
+        stopwatchInterval = setInterval(updateStopwatch, 10);
+        window.countdownInterval = setInterval(updateCountdownDisplays, 50);
+        startStopButton.textContent = "停止";
+      }
+      stopwatchRunning = !stopwatchRunning;
+    });
+
+    resetButton2.addEventListener("click", (e) => {
+      e.preventDefault();
+      clearInterval(stopwatchInterval);
+      clearInterval(window.countdownInterval);
+      stopwatchTime.textContent = "00:00:00.00";
+      stopwatchRunning = false;
+      stopwatchStartTime = 0;
+      stopwatchElapsed = 0;
+      startStopButton.textContent = "開始";
+      resetCountdownDisplays();
+    });
+    /*
+移動速度=x/2f　2fあたり何マス進むか
+攻撃発生=f
+{(ステージ幅[マス]-1600+100-射程[マス])/移動速度[マス/2f]*2+攻撃発生[f]}/30[f/s]=生産～攻撃までの秒数
+最大→基準一体目 
+最大-小=基準生産x秒後に生産
+(めり込みは無視)
+お金増加速度:8.31円/F　=249.3円/s
+140 10 8
+110 8  8
+150 12 8
+350 10 8
+140 30 6
+170 10 10
+150 10 10
+400 10 10
+150 8 18
+250 38 7
+*/
+
+// Chart.jsのCDNを読み込む
+const chartScript = document.createElement('script');
+chartScript.src = "https://cdn.jsdelivr.net/npm/chart.js";
+document.head.appendChild(chartScript);
+
+let moneyChartInstance = null;
+
+// 計算ボタンが押されたときにグラフを描画
+function drawMoneyChart() {
+  const seconds = [];
+  const money = [];
+  // 各キャラのコスト取得
+  const costs = [];
+  for(let i=1; i<=10; i++) {
+    const costInput = document.querySelector(`[name="neko${i}_cost"]`);
+    let cost = costInput ? Number(costInput.value) : 0;
+    costs.push(isNaN(cost) ? 0 : cost);
+  }
+  // 各キャラの生産タイミング取得
+  const eventTimes = countdownValues.map(v => typeof v === "number" ? v : null);
+
+  // 横軸の最大値を計算
+  let maxEventTime = Math.max(...eventTimes.filter(v => v !== null));
+  let xMax = Math.ceil(maxEventTime + 3);
+
+  let currentMoney = 16500;
+  let lastMoney = 16500;
+  let slope = 249.3;
+
+  for(let t=0; t<=xMax*100; t++) {
+    let timeSec = t / 100;
+    if (lastMoney < 16500) {
+      slope = 249.3;
+    }
+    currentMoney = lastMoney + slope / 100;
+    for(let i=0; i<10; i++) {
+      if(eventTimes[i] !== null && Math.abs(timeSec - eventTimes[i]) < 0.005) {
+        currentMoney -= costs[i];
+      }
+    }
+    if (currentMoney >= 16500) {
+      currentMoney = 16500;
+      slope = 0;
+    }
+    seconds.push(timeSec);
+    money.push(currentMoney);
+    lastMoney = currentMoney;
+  }
+
+  window.lastMoneyArray = money;
+
+  const ctx = document.getElementById('moneyChart').getContext('2d');
+  if (moneyChartInstance) {
+    moneyChartInstance.destroy();
+  }
+  moneyChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: seconds,
+      datasets: [{
+        label: 'お金（円）',
+        data: money,
+        borderColor: '#0070c0',
+        backgroundColor: 'rgba(0,112,192,0.1)',
+        fill: false,
+        pointRadius: 0,
+        borderWidth: 2
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: '時間（秒）' },
+          min: 0,
+          max: xMax,
+          ticks: {
+            autoSkip: true,
+            maxTicksLimit: 12
+          }
+        },
+        y: {
+          title: { display: true, text: 'お金（円）' },
+          min: Math.min(...money) - 100,
+          max: 16500
+        }
+      }
+    }
+  });
+}
+</script>
+</body>
+</html>
