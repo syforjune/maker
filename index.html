@@ -142,8 +142,24 @@
       padding: 10px;
       background: #f7f7f7;
       display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .preset-row {
+      width: 100%;
+      display: flex;
       align-items: center;
       gap: 10px;
+      justify-content: flex-start;
+    }
+    .stage-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-start;
+      margin-top: 4px;
     }
     .config-label {
       font-weight: bold;
@@ -191,14 +207,80 @@ input[type="number"] {
   appearance: textfield;
   -moz-appearance: textfield;
 }
+    /* Chart control button styles */
+    .chart-controls .chart-btn {
+      background: #0070c0;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+      transition: background .12s, transform .06s;
+    }
+    .chart-controls .chart-btn:hover { background: #005a99; transform: translateY(-1px); }
+    .chart-controls .chart-btn:active { transform: translateY(0); }
+    .chart-controls .chart-btn.small { padding: 4px 6px; border-radius: 4px; font-size: 0.9em; }
+  /* zoom-factor class removed because factor input was removed */
+  /* preset dropdown in top-right */
+  .preset-controls { margin-right: auto; display:flex; align-items:center; gap:10px; position:relative; }
+  .preset-controls .box { width:220px; height:30px; padding:3px 8px; box-sizing:border-box; }
+    .preset-controls .current-preset {
+      font-weight:700;
+      margin-right:6px;
+      min-width:140px;
+      max-width:220px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      color:#333;
+      font-size:13px;
+    }
+  /* Make preset-related buttons wider horizontally so labels don't get truncated; keep vertical height slim */
+  .preset-controls .chart-btn {
+    min-width:180px; /* wider so longer labels fit on one line */
+    padding:4px 14px; /* reduced vertical padding */
+    height:34px;
+    line-height:1.1;
+    white-space:nowrap; /* keep on one line */
+  }
+  .preset-controls .chart-btn.small {
+    min-width:160px;
+    padding:3px 12px;
+    height:32px;
+    line-height:1.1;
+    white-space:nowrap;
+  }
+  .preset-dropdown { position:absolute; right:0; top:40px; background:#fff; border:1px solid #ccc; padding:8px; box-shadow:0 6px 18px rgba(0,0,0,0.12); display:none; z-index:60; max-height:320px; overflow:auto; min-width:420px; }
+  .preset-dropdown.open { display:block; }
+  .preset-dropdown div { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  /* Make the buttons inside the preset dropdown narrower (about half the width of top controls) */
+  .preset-dropdown .chart-btn.small {
+    min-width:80px;
+    padding:4px 8px;
+    height:26px;
+    box-sizing:border-box;
+  }
   </style>
 </head>
 <body>
   <div class="config-area">
-    <span class="config-label">ステージ幅:</span>
-    <input type="number" id="stageLengthInput" class="config-input" value="3600" min="0">
-    <button type="button" class="gakkari-btn" id="gakkariBtn">がっかり用心棒</button>
-    <button type="button" class="isabiri-btn" id="isabiriBtn">いさびりヘッド / 逆襲のカオル君</button>
+    <div class="preset-row">
+      <div class="preset-controls">
+  <span id="currentPresetName" class="current-preset">選択中: —</span>
+        <input type="text" id="presetNameInputTop" class="box" placeholder="プリセット名">
+        <button id="savePresetBtnTop" class="chart-btn small">プリセット保存</button>
+  <button id="togglePresetsBtn" class="chart-btn small">プリセット一覧 ▾</button>
+  <button id="clearSavedBtnTop" class="chart-btn small" style="background:#c0392b">保存クリア</button>
+        <div id="presetDropdown" class="preset-dropdown" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="stage-row">
+      <span class="config-label">ステージ幅:</span>
+      <input type="number" id="stageLengthInput" class="config-input" value="3600" min="0">
+      <button type="button" class="gakkari-btn" id="gakkariBtn">がっかり用心棒</button>
+      <button type="button" class="isabiri-btn" id="isabiriBtn">いさびりヘッド / 逆襲のカオル君</button>
+    </div>
   </div>
   <div id="message1">
     <form class="keisan_form" name="keisan_form">
@@ -403,7 +485,9 @@ input[type="number"] {
             <input type="button" class="calc-btn" onclick="calc()" value="計算">
             <input type="button" class="calc-btn hidden" id="sortButton" onclick="sortResults()" value="昇順">
             <input type="button" class="calc-btn hidden" id="resetButton" onclick="resetResults()" value="戻る">
+            
           </div>
+          
         <ul class="result-list" id="resultList">
           <li>
             <span class="countdown" id="countdown1">--</span>
@@ -468,7 +552,31 @@ input[type="number"] {
   <div id="message2" class="hidden">条件2に合致すると表示されます。</div>
 <!-- 計算ボタンの下（calc-areaの直後）にグラフ用canvasを追加 -->
 <div style="margin: 16px 0;">
-  <canvas id="moneyChart" width="400" height="250"></canvas>
+  <div class="chart-container" style="position:relative; width:100%; height:260px;">
+    <div class="chart-controls" style="position:absolute; top:6px; right:6px; z-index:10; background:rgba(255,255,255,0.95); padding:8px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.12);">
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="resetZoomBtn" class="chart-btn" type="button" title="リセット">リセット</button>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button id="zoomXInBtn" class="chart-btn small" type="button" title="X軸拡大">X＋</button>
+          <button id="zoomXOutBtn" class="chart-btn small" type="button" title="X軸縮小">X−</button>
+          <button id="zoomYInBtn" class="chart-btn small" type="button" title="Y軸拡大">Y＋</button>
+          <button id="zoomYOutBtn" class="chart-btn small" type="button" title="Y軸縮小">Y−</button>
+        </div>
+      </div>
+      <!-- サイズ変更コントロール（幅ボタンを削除） -->
+      <div style="display:flex; gap:6px; align-items:center; margin-top:8px;">
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button id="heightIncBtn" class="chart-btn small" type="button" title="高さを広げる">高＋</button>
+          <button id="heightDecBtn" class="chart-btn small" type="button" title="高さを狭める">高−</button>
+        </div>
+        <button id="resetSizeBtn" class="chart-btn small" type="button" title="サイズを初期に戻す" style="margin-left:6px;">サイズリセット</button>
+      </div>
+      <div style="font-size:11px;color:#666;margin-top:6px;">ドラッグでパン可能</div>
+    </div>
+    <canvas id="moneyChart" width="400" height="250"></canvas>
+    <canvas id="overlayCanvas" style="position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; display:block;
+      z-index:20;"></canvas>
+  </div>
 </div>
 <script>
     // 定数の定義
@@ -529,6 +637,154 @@ input[type="number"] {
     }
   }
 }
+
+  // --- Overlay (moving blue vertical line) ---
+  function updateOverlaySize() {
+    const overlay = document.getElementById('overlayCanvas');
+    const chartCanvas = document.getElementById('moneyChart');
+    if (!overlay || !chartCanvas) return;
+    const rect = chartCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    overlay.style.width = rect.width + 'px';
+    overlay.style.height = rect.height + 'px';
+    overlay.width = Math.round(rect.width * dpr);
+    overlay.height = Math.round(rect.height * dpr);
+    const ctx = overlay.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function clearOverlay() {
+    const overlay = document.getElementById('overlayCanvas');
+    if (!overlay) return;
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+  }
+
+  function drawCurrentLine(timeSec) {
+    const overlay = document.getElementById('overlayCanvas');
+    if (!overlay || !moneyChartInstance) return;
+  const ctx = overlay.getContext('2d');
+  // clear (reset transform first to clear device-pixel area cleanly)
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.clearRect(0, 0, overlay.width, overlay.height);
+  // restore transform to CSS pixels
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+    const xScale = moneyChartInstance.scales.x;
+    const chartArea = moneyChartInstance.chartArea;
+    if (!xScale || !chartArea) return;
+    // get pixel for value
+    let px;
+    try {
+      px = xScale.getPixelForValue(timeSec);
+    } catch (err) {
+      return;
+    }
+    // draw vertical blue line
+    const top = chartArea.top;
+    const bottom = chartArea.bottom;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0,112,192,0.95)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(px + 0.5, top + 0.5);
+    ctx.lineTo(px + 0.5, bottom + 0.5);
+    ctx.stroke();
+    // small head circle
+    ctx.fillStyle = 'rgba(0,112,192,0.95)';
+    ctx.beginPath();
+    ctx.arc(px, top - 6, 4, 0, Math.PI * 2);
+    ctx.fill();
+    // draw time label above the chart (format mm:ss.cc)
+    const formatTime = (s) => {
+      if (!isFinite(s)) return '--:--.00';
+      const totalCs = Math.floor(s * 100);
+      const cs = totalCs % 100;
+      const totalSec = Math.floor(totalCs / 100);
+      const sec = totalSec % 60;
+      const min = Math.floor(totalSec / 60);
+      return String(min).padStart(2,'0') + ':' + String(sec).padStart(2,'0') + '.' + String(cs).padStart(2,'0');
+    };
+    const label = formatTime(timeSec);
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    // compute label position, keep within chart left/right bounds
+    const padding = 6;
+    const labelX = Math.min(Math.max(px, chartArea.left + padding), chartArea.right - padding);
+    const labelY = chartArea.top - 10; // a bit above the top
+    // draw background for readability
+    const metrics = ctx.measureText(label);
+    const labelW = metrics.width + 8;
+    const labelH = 16;
+    const rectX = labelX - labelW/2;
+    const rectY = labelY - labelH;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    roundRect(ctx, rectX, rectY, labelW, labelH, 4, true, false);
+    // draw label text in blue
+    ctx.fillStyle = 'rgba(0,112,192,0.95)';
+    ctx.fillText(label, labelX, labelY - 2);
+    ctx.restore();
+  }
+
+  // helper: rounded rect
+  function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+    if (typeof stroke === 'undefined') {
+      stroke = true;
+    }
+    if (typeof radius === 'undefined') {
+      radius = 5;
+    }
+    if (typeof radius === 'number') {
+      radius = { tl: radius, tr: radius, br: radius, bl: radius };
+    } else {
+      var defaultRadius = { tl: 0, tr: 0, br: 0, bl: 0 };
+      for (var side in defaultRadius) {
+        radius[side] = radius[side] || defaultRadius[side];
+      }
+    }
+    ctx.beginPath();
+    ctx.moveTo(x + radius.tl, y);
+    ctx.lineTo(x + width - radius.tr, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius.tr);
+    ctx.lineTo(x + width, y + height - radius.br);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius.br, y + height);
+    ctx.lineTo(x + radius.bl, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius.bl);
+    ctx.lineTo(x, y + radius.tl);
+    ctx.quadraticCurveTo(x, y, x + radius.tl, y);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  function startOverlayAnimation() {
+    // ensure overlay sized to chart
+    updateOverlaySize();
+    // animation
+    if (window.overlayRafId) cancelAnimationFrame(window.overlayRafId);
+    function step() {
+      if (!stopwatchRunning) return; // stop if no longer running
+      const elapsed = stopwatchElapsed + (stopwatchRunning ? (Date.now() - stopwatchStartTime) : 0);
+      const secs = elapsed / 1000;
+      drawCurrentLine(secs);
+      window.overlayRafId = requestAnimationFrame(step);
+    }
+    // draw initial at 0 if starting fresh
+    const elapsed0 = stopwatchElapsed + (stopwatchRunning ? (Date.now() - stopwatchStartTime) : 0);
+    drawCurrentLine(elapsed0 / 1000);
+    window.overlayRafId = requestAnimationFrame(step);
+  }
+
+  function stopOverlayAnimation() {
+    if (window.overlayRafId) {
+      cancelAnimationFrame(window.overlayRafId);
+      window.overlayRafId = null;
+    }
+  }
+
+  // resize overlay when window or chart resizes
+  window.addEventListener('resize', () => { updateOverlaySize(); if (!stopwatchRunning) clearOverlay(); });
     // 入力欄のイベント設定
     for (let i = 1; i <= 10; i++) {
       const charnameInput = document.getElementById(`charname${i}`);
@@ -542,8 +798,347 @@ input[type="number"] {
 
     let countdownValues = Array(10).fill(null);
 let countdownIntervals = Array(10).fill(null);
+    // flags to avoid repeating beep per character when countdown reaches zero
+    let countdownAlerted = Array(10).fill(false);
+    // AudioContext for beep; created on user gesture (start) or lazily
+    let beepAudioCtx = null;
 
-function calc() {
+    // Restore saved inputs (names, stats, costs, stage length) if any
+    window.addEventListener("DOMContentLoaded", loadInputsFromLocalStorage);
+
+    // --- LocalStorage persistence for inputs ---
+    const STORAGE_KEY = 'maker1_inputs_v1';
+
+    function saveInputsToLocalStorage() {
+      try {
+        const data = {};
+        // stage length
+        const stageInput = document.getElementById('stageLengthInput');
+        if (stageInput) data.stageLength = stageInput.value;
+        // for 10 characters
+        data.chars = [];
+        for (let i = 1; i <= 10; i++) {
+          const obj = {};
+          const name = document.getElementById(`charname${i}`);
+          obj.name = name ? name.value : '';
+          const range = document.querySelector(`[name="neko${i}_range"]`);
+          const speed = document.querySelector(`[name="neko${i}_speed"]`);
+          const attack = document.querySelector(`[name="neko${i}_attack"]`);
+          const cost = document.querySelector(`[name="neko${i}_cost"]`);
+          obj.range = range ? range.value : '';
+          obj.speed = speed ? speed.value : '';
+          obj.attack = attack ? attack.value : '';
+          obj.cost = cost ? cost.value : '';
+          data.chars.push(obj);
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.warn('saveInputsToLocalStorage failed', e);
+      }
+    }
+
+    function loadInputsFromLocalStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data) return;
+        if (data.stageLength) {
+          const stageInput = document.getElementById('stageLengthInput');
+          if (stageInput) stageInput.value = data.stageLength;
+        }
+        if (Array.isArray(data.chars)) {
+          for (let i = 0; i < data.chars.length && i < 10; i++) {
+            const c = data.chars[i];
+            const name = document.getElementById(`charname${i+1}`);
+            if (name && typeof c.name === 'string') name.value = c.name;
+            const range = document.querySelector(`[name="neko${i+1}_range"]`);
+            const speed = document.querySelector(`[name="neko${i+1}_speed"]`);
+            const attack = document.querySelector(`[name="neko${i+1}_attack"]`);
+            const cost = document.querySelector(`[name="neko${i+1}_cost"]`);
+            if (range && typeof c.range !== 'undefined') range.value = c.range;
+            if (speed && typeof c.speed !== 'undefined') speed.value = c.speed;
+            if (attack && typeof c.attack !== 'undefined') attack.value = c.attack;
+            if (cost && typeof c.cost !== 'undefined') cost.value = c.cost;
+          }
+        }
+        // reflect loaded names to result labels
+        updateResultLabels();
+      } catch (e) {
+        console.warn('loadInputsFromLocalStorage failed', e);
+      }
+    }
+
+    // attach input listeners to auto-save when user edits
+    function attachAutoSaveListeners() {
+      try {
+        const selectors = [];
+        for (let i = 1; i <= 10; i++) {
+          selectors.push(`#charname${i}`);
+          selectors.push(`[name="neko${i}_range"]`);
+          selectors.push(`[name="neko${i}_speed"]`);
+          selectors.push(`[name="neko${i}_attack"]`);
+          selectors.push(`[name="neko${i}_cost"]`);
+        }
+        selectors.push('#stageLengthInput');
+        selectors.forEach(sel => {
+          const el = document.querySelector(sel);
+          if (el) el.addEventListener('input', () => { saveInputsToLocalStorage(); updateResultLabels(); });
+        });
+        // save also when calc is run
+        const calcBtn = document.querySelector('input[type="button"][value="計算"]');
+        if (calcBtn) calcBtn.addEventListener('click', saveInputsToLocalStorage);
+        // and onbeforeunload as a last resort
+        window.addEventListener('beforeunload', saveInputsToLocalStorage);
+      } catch (e) {
+        console.warn('attachAutoSaveListeners failed', e);
+      }
+    }
+
+    // ensure listeners are attached once DOM ready
+    window.addEventListener('DOMContentLoaded', attachAutoSaveListeners);
+
+    // Clear saved inputs (remove from localStorage and reset fields)
+    function clearSavedInputs() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {
+        console.warn('clearSavedInputs: removeItem failed', e);
+      }
+      // reset stage length to default
+      const stageInput = document.getElementById('stageLengthInput');
+      if (stageInput) stageInput.value = 3600;
+      // reset character inputs
+      const defaultNames = ["キャラ①","キャラ②","キャラ③","キャラ④","キャラ⑤","キャラ⑥","キャラ⑦","キャラ⑧","キャラ⑨","キャラ⑩"];
+      for (let i = 1; i <= 10; i++) {
+        const nameEl = document.getElementById(`charname${i}`);
+        const range = document.querySelector(`[name="neko${i}_range"]`);
+        const speed = document.querySelector(`[name="neko${i}_speed"]`);
+        const attack = document.querySelector(`[name="neko${i}_attack"]`);
+        const cost = document.querySelector(`[name="neko${i}_cost"]`);
+        if (nameEl) nameEl.value = defaultNames[i-1];
+        if (range) range.value = '';
+        if (speed) speed.value = '';
+        if (attack) attack.value = '';
+        if (cost) cost.value = '';
+      }
+      updateResultLabels();
+    }
+
+  // wire clear button (support old id and new top-right id)
+  const clearBtn = document.getElementById('clearSavedBtn') || document.getElementById('clearSavedBtnTop');
+  if (clearBtn) clearBtn.addEventListener('click', (e) => { e.preventDefault(); if (confirm('保存データを削除し、入力欄を初期化しますか？')) clearSavedInputs(); });
+
+    // --- Preset save/load ---
+    const STORAGE_PRESETS_KEY = 'maker1_presets_v1';
+
+    function getPresets() {
+      try {
+        const raw = localStorage.getItem(STORAGE_PRESETS_KEY);
+        if (!raw) return [];
+        return JSON.parse(raw) || [];
+      } catch (e) {
+        console.warn('getPresets failed', e);
+        return [];
+      }
+    }
+
+    function setPresets(arr) {
+      try {
+        localStorage.setItem(STORAGE_PRESETS_KEY, JSON.stringify(arr));
+      } catch (e) { console.warn('setPresets failed', e); }
+    }
+
+    function renderPresetList() {
+      const container = document.getElementById('presetDropdown');
+      if (!container) return;
+      const presets = getPresets();
+      if (!presets.length) { container.innerHTML = '<small>プリセットはありません</small>'; return; }
+      container.innerHTML = '';
+      presets.forEach((p, idx) => {
+        const row = document.createElement('div');
+        row.style.marginBottom = '6px';
+        const left = document.createElement('div');
+        left.style.flex = '1';
+        left.textContent = p.name;
+        row.appendChild(left);
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.gap = '6px';
+        const loadBtn = document.createElement('button');
+        loadBtn.textContent = '読み込み';
+        loadBtn.className = 'chart-btn small';
+        loadBtn.addEventListener('click', (e)=>{ e.preventDefault(); loadPreset(p.name); document.getElementById('presetDropdown').classList.remove('open'); document.getElementById('presetDropdown').setAttribute('aria-hidden','true'); });
+        right.appendChild(loadBtn);
+  const editBtn = document.createElement('button');
+  editBtn.textContent = '名称変更';
+  editBtn.className = 'chart-btn small';
+  editBtn.addEventListener('click', (e)=>{ e.preventDefault(); editPreset(p.name); });
+  right.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '削除';
+        delBtn.className = 'chart-btn small';
+        delBtn.style.background = '#c0392b';
+        delBtn.addEventListener('click', (e)=>{ e.preventDefault(); if (confirm(`プリセット "${p.name}" を削除しますか？`)) deletePreset(p.name); });
+        right.appendChild(delBtn);
+        row.appendChild(right);
+        container.appendChild(row);
+      });
+    }
+
+    // Update the displayed current preset name (left of input)
+    function setCurrentPresetName(name) {
+      const el = document.getElementById('currentPresetName');
+      if (!el) return;
+      if (name && name.trim()) el.textContent = `選択中: ${name}`;
+      else el.textContent = '選択中: —';
+    }
+
+    function savePreset(name) {
+      if (!name || !name.trim()) { alert('プリセット名を入力してください'); return; }
+      const presets = getPresets();
+      // build current data
+      const data = {};
+      const stageInput = document.getElementById('stageLengthInput');
+      if (stageInput) data.stageLength = stageInput.value;
+      data.chars = [];
+      for (let i=1;i<=10;i++) {
+        const obj = {};
+        const nameEl = document.getElementById(`charname${i}`);
+        obj.name = nameEl ? nameEl.value : '';
+        const range = document.querySelector(`[name="neko${i}_range"]`);
+        const speed = document.querySelector(`[name="neko${i}_speed"]`);
+        const attack = document.querySelector(`[name="neko${i}_attack"]`);
+        const cost = document.querySelector(`[name="neko${i}_cost"]`);
+        obj.range = range ? range.value : '';
+        obj.speed = speed ? speed.value : '';
+        obj.attack = attack ? attack.value : '';
+        obj.cost = cost ? cost.value : '';
+        data.chars.push(obj);
+      }
+      const existingIdx = presets.findIndex(p=>p.name===name);
+      if (existingIdx !== -1) {
+        if (!confirm('同名のプリセットがあります。上書きしますか？')) return;
+        presets[existingIdx].data = data;
+        presets[existingIdx].updatedAt = Date.now();
+      } else {
+        presets.push({ name: name, data: data, createdAt: Date.now() });
+      }
+      setPresets(presets);
+  renderPresetList();
+  try { setCurrentPresetName(name); } catch(e) {}
+      // update default next preset name in top input if present
+      try {
+        const presetsAfter = getPresets();
+        const nameTop = document.getElementById('presetNameInputTop');
+        if (nameTop) nameTop.value = `プリセット${presetsAfter.length + 1}`;
+      } catch (e) {}
+      alert('プリセットを保存しました');
+    }
+
+    function loadPreset(name) {
+      const presets = getPresets();
+      const p = presets.find(x=>x.name===name);
+      if (!p) { alert('プリセットが見つかりません'); return; }
+      const d = p.data || {};
+      if (d.stageLength !== undefined) {
+        const stageInput = document.getElementById('stageLengthInput'); if (stageInput) stageInput.value = d.stageLength;
+      }
+      if (Array.isArray(d.chars)) {
+        for (let i=0;i<d.chars.length && i<10;i++) {
+          const c = d.chars[i];
+          const nameEl = document.getElementById(`charname${i+1}`);
+          if (nameEl && typeof c.name === 'string') nameEl.value = c.name;
+          const range = document.querySelector(`[name="neko${i+1}_range"]`);
+          const speed = document.querySelector(`[name="neko${i+1}_speed"]`);
+          const attack = document.querySelector(`[name="neko${i+1}_attack"]`);
+          const cost = document.querySelector(`[name="neko${i+1}_cost"]`);
+          if (range && typeof c.range !== 'undefined') range.value = c.range;
+          if (speed && typeof c.speed !== 'undefined') speed.value = c.speed;
+          if (attack && typeof c.attack !== 'undefined') attack.value = c.attack;
+          if (cost && typeof c.cost !== 'undefined') cost.value = c.cost;
+        }
+      }
+      updateResultLabels();
+      saveInputsToLocalStorage();
+      try { setCurrentPresetName(name); } catch(e) {}
+    }
+
+    function deletePreset(name) {
+      const presets = getPresets();
+      const idx = presets.findIndex(p=>p.name===name);
+      if (idx === -1) return;
+      presets.splice(idx,1);
+      setPresets(presets);
+      renderPresetList();
+      try { const nameTop = document.getElementById('presetNameInputTop'); if (nameTop) nameTop.value = `プリセット${getPresets().length + 1}`; } catch(e) {}
+      // if the deleted preset was the one currently shown, clear it
+  try { const cur = document.getElementById('currentPresetName'); if (cur && cur.textContent === `選択中: ${name}`) setCurrentPresetName(null); } catch(e) {}
+    }
+
+    // Rename a preset. Prompt user for new name, handle duplicates (confirm overwrite).
+    function editPreset(oldName) {
+      const presets = getPresets();
+      const idx = presets.findIndex(p=>p.name===oldName);
+      if (idx === -1) { alert('プリセットが見つかりません'); return; }
+      const current = presets[idx];
+      const newNameRaw = prompt('プリセットの新しい名前を入力してください', current.name);
+      if (newNameRaw === null) return; // cancelled
+      const newName = newNameRaw.trim();
+      if (!newName) { alert('名前は空にできません'); return; }
+      if (newName === current.name) return; // no change
+      const existingIdx = presets.findIndex(p=>p.name===newName);
+      if (existingIdx !== -1 && existingIdx !== idx) {
+        if (!confirm(`既に同名のプリセット "${newName}" が存在します。上書きしますか？`)) return;
+        // remove the existing one so we can rename without duplicate
+        presets.splice(existingIdx,1);
+      }
+      // find the actual index of the preset object (in case array shifted)
+      const actualIdx = presets.indexOf(current);
+      if (actualIdx === -1) { alert('内部エラー: プリセットが見つかりません'); return; }
+      presets[actualIdx].name = newName;
+      presets[actualIdx].updatedAt = Date.now();
+      setPresets(presets);
+      renderPresetList();
+      try { const nameTop = document.getElementById('presetNameInputTop'); if (nameTop && (!nameTop.value || nameTop.value.trim()==='')) nameTop.value = `プリセット${getPresets().length + 1}`; } catch(e) {}
+      // if the renamed preset was currently shown, update the label
+  try { const cur = document.getElementById('currentPresetName'); if (cur && cur.textContent === `選択中: ${oldName}`) setCurrentPresetName(newName); } catch(e) {}
+      alert('プリセット名を変更しました');
+    }
+
+    // wire preset UI events after DOM (top-right controls)
+    window.addEventListener('DOMContentLoaded', () => {
+      renderPresetList();
+      const saveBtnTop = document.getElementById('savePresetBtnTop');
+      const nameInputTop = document.getElementById('presetNameInputTop');
+      const clearTop = document.getElementById('clearSavedBtnTop');
+      const toggleBtn = document.getElementById('togglePresetsBtn');
+      const dropdown = document.getElementById('presetDropdown');
+      // set default preset name like 'プリセット1', 'プリセット2', ... depending on saved count
+      try {
+        const presets = getPresets();
+        if (nameInputTop && (!nameInputTop.value || nameInputTop.value.trim()==="")) {
+          nameInputTop.value = `プリセット${presets.length + 1}`;
+        }
+      } catch (e) {
+        // ignore
+      }
+      if (saveBtnTop && nameInputTop) saveBtnTop.addEventListener('click', (e)=>{ e.preventDefault(); savePreset(nameInputTop.value.trim()); });
+      if (clearTop) clearTop.addEventListener('click', (e)=>{ e.preventDefault(); if (confirm('保存データを削除し、入力欄を初期化しますか？')) clearSavedInputs(); });
+      if (toggleBtn && dropdown) {
+        toggleBtn.addEventListener('click', (e)=>{ e.preventDefault(); const open = dropdown.classList.toggle('open'); dropdown.setAttribute('aria-hidden', String(!open)); if (open) renderPresetList(); });
+        // click outside to close
+        document.addEventListener('click', (ev)=>{
+          const t = ev.target;
+          if (!dropdown.contains(t) && !toggleBtn.contains(t)) {
+            dropdown.classList.remove('open');
+            dropdown.setAttribute('aria-hidden', 'true');
+          }
+        });
+      }
+    });
+
+    function calc() {
         const formData = document.forms.keisan_form;
         const characterData = {};
 
@@ -618,6 +1213,10 @@ function calc() {
                 html: listItem.outerHTML
             });
         }
+
+  // reset beep-alert flags and countdown offset for new calculation
+  countdownAlerted = Array(10).fill(false);
+  countdownOffsetMs = 0;
 
         // 計算ボタンが押されたら昇順ボタンを表示
         document.getElementById("sortButton").classList.remove("hidden");
@@ -721,8 +1320,9 @@ function calc() {
             resultList.innerHTML += item.html;
         });
 
-        sortButton.classList.remove("hidden");
-        resetButton.classList.add("hidden");
+    // After user presses '戻る', hide the 昇順 button until the next 計算.
+    sortButton.classList.add("hidden");
+    resetButton.classList.add("hidden");
         updateResultLabels();
     }
 
@@ -732,6 +1332,8 @@ function calc() {
     let stopwatchElapsed = 0;
     let stopwatchRunning = false;
     let countdownStartTime = null;
+    // accumulated elapsed ms for countdowns when paused/resumed
+    let countdownOffsetMs = 0;
 
     const stopwatchTime = document.getElementById("stopwatchTime");
     const startStopButton = document.getElementById("startStopButton");
@@ -759,18 +1361,55 @@ function calc() {
     }
 
     function updateCountdownDisplays() {
-  if (!countdownStartTime) return;
+  // compute elapsed ms: when running use realtime, when paused use accumulated offset
+  const elapsedMs = countdownStartTime ? (Date.now() - countdownStartTime) : countdownOffsetMs;
   for (let i = 0; i < 10; i++) {
     const span = document.getElementById(`countdown${i+1}`);
     if (countdownValues[i] !== null) {
-      let remain = countdownValues[i] - ((Date.now() - countdownStartTime) / 1000);
-      if (remain < 0) remain = 0;
+      let remain = countdownValues[i] - (elapsedMs / 1000);
+      // When reach zero (or below), trigger beep once
+      if (remain <= 0) {
+        if (!countdownAlerted[i]) {
+          try { if (!beepAudioCtx && (window.AudioContext || window.webkitAudioContext)) beepAudioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e) {}
+          playBeep();
+          countdownAlerted[i] = true;
+        }
+        remain = 0;
+      }
       span.textContent = remain.toFixed(2);
     } else {
       span.textContent = "--";
     }
   }
 }
+
+    // Play a short high beep using Web Audio API. freq in Hz, duration in seconds
+    function playBeep(freq = 1800, duration = 0.12) {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        if (!beepAudioCtx) {
+          // create lazily; if this is blocked by the browser it will be created on next user gesture
+          beepAudioCtx = new AudioCtx();
+        }
+        const ctx = beepAudioCtx;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.9, now + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      } catch (e) {
+        // ignore audio errors
+        console.warn('beep failed', e);
+      }
+    }
 
 function resetCountdownDisplays() {
   countdownStartTime = null;
@@ -788,19 +1427,35 @@ function resetCountdownDisplays() {
     startStopButton.addEventListener("click", (e) => {
       e.preventDefault();
       if (stopwatchRunning) {
+        // pause
         stopwatchElapsed += Date.now() - stopwatchStartTime;
         clearInterval(stopwatchInterval);
         clearInterval(window.countdownInterval);
         startStopButton.textContent = "開始";
-        resetCountdownDisplays();
+        // record accumulated elapsed for countdowns and pause them
+        if (countdownStartTime) {
+          countdownOffsetMs = Date.now() - countdownStartTime;
+          countdownStartTime = null;
+        }
+        // update displays once to show paused values
+        updateCountdownDisplays();
+        stopwatchRunning = false;
+        // stop overlay animation
+        stopOverlayAnimation();
       } else {
+        // start or resume
         stopwatchStartTime = Date.now();
-        countdownStartTime = Date.now();
+        // resume countdowns, preserving offset
+        countdownStartTime = Date.now() - (countdownOffsetMs || 0);
         stopwatchInterval = setInterval(updateStopwatch, 10);
         window.countdownInterval = setInterval(updateCountdownDisplays, 50);
         startStopButton.textContent = "停止";
+        stopwatchRunning = true;
+        // create AudioContext on user gesture if possible so beeps will play
+        try { if (!beepAudioCtx && (window.AudioContext || window.webkitAudioContext)) beepAudioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e) {}
+        // start overlay animation
+        startOverlayAnimation();
       }
-      stopwatchRunning = !stopwatchRunning;
     });
 
     resetButton2.addEventListener("click", (e) => {
@@ -813,6 +1468,12 @@ function resetCountdownDisplays() {
       stopwatchElapsed = 0;
       startStopButton.textContent = "開始";
       resetCountdownDisplays();
+      // reset beep flags and countdown offset as well
+      countdownAlerted = Array(10).fill(false);
+      countdownOffsetMs = 0;
+      // stop and clear overlay
+      stopOverlayAnimation();
+      clearOverlay();
     });
     /*
 移動速度=x/2f　2fあたり何マス進むか
@@ -822,16 +1483,6 @@ function resetCountdownDisplays() {
 最大-小=基準生産x秒後に生産
 (めり込みは無視)
 お金増加速度:8.31円/F　=249.3円/s
-140 10 8
-110 8  8
-150 12 8
-350 10 8
-140 30 6
-170 10 10
-150 10 10
-400 10 10
-150 8 18
-250 38 7
 */
 
 // Chart.jsのCDNを読み込む
@@ -843,89 +1494,418 @@ let moneyChartInstance = null;
 
 // 計算ボタンが押されたときにグラフを描画
 function drawMoneyChart() {
-  const seconds = [];
-  const money = [];
-  // 各キャラのコスト取得
-  const costs = [];
-  for(let i=1; i<=10; i++) {
-    const costInput = document.querySelector(`[name="neko${i}_cost"]`);
-    let cost = costInput ? Number(costInput.value) : 0;
-    costs.push(isNaN(cost) ? 0 : cost);
-  }
-  // 各キャラの生産タイミング取得
-  const eventTimes = countdownValues.map(v => typeof v === "number" ? v : null);
-
-  // 横軸の最大値を計算
-  let maxEventTime = Math.max(...eventTimes.filter(v => v !== null));
-  let xMax = Math.ceil(maxEventTime + 3);
-
-  let currentMoney = 16500;
-  let lastMoney = 16500;
-  let slope = 249.3;
-
-  for(let t=0; t<=xMax*100; t++) {
-    let timeSec = t / 100;
-    if (lastMoney < 16500) {
-      slope = 249.3;
+    const seconds = [];
+    const money = [];
+    // 各キャラのコスト取得
+    const costs = [];
+    for(let i=1; i<=10; i++) {
+      const costInput = document.querySelector(`[name="neko${i}_cost"]`);
+      let cost = costInput ? Number(costInput.value) : 0;
+      costs.push(isNaN(cost) ? 0 : cost);
     }
-    currentMoney = lastMoney + slope / 100;
-    for(let i=0; i<10; i++) {
-      if(eventTimes[i] !== null && Math.abs(timeSec - eventTimes[i]) < 0.005) {
-        currentMoney -= costs[i];
+    // 各キャラの生産タイミング取得
+    const eventTimes = countdownValues.map(v => typeof v === "number" ? v : null);
+
+    // 横軸の最大値を計算（イベントが無い場合は30秒をデフォルト）
+    const validTimes = eventTimes.filter(v => v !== null);
+    let maxEventTime = validTimes.length ? Math.max(...validTimes) : 30;
+    let xMax = Math.ceil(maxEventTime + 3);
+
+    let currentMoney = 16500;
+    let lastMoney = 16500;
+    let slope = 249.3;
+
+    for(let t=0; t<=xMax*100; t++) {
+      let timeSec = t / 100;
+      if (lastMoney < 16500) {
+        slope = 249.3;
       }
-    }
-    if (currentMoney >= 16500) {
-      currentMoney = 16500;
-      slope = 0;
-    }
-    seconds.push(timeSec);
-    money.push(currentMoney);
-    lastMoney = currentMoney;
-  }
-
-  window.lastMoneyArray = money;
-
-  const ctx = document.getElementById('moneyChart').getContext('2d');
-  if (moneyChartInstance) {
-    moneyChartInstance.destroy();
-  }
-  moneyChartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: seconds,
-      datasets: [{
-        label: 'お金（円）',
-        data: money,
-        borderColor: '#0070c0',
-        backgroundColor: 'rgba(0,112,192,0.1)',
-        fill: false,
-        pointRadius: 0,
-        borderWidth: 2
-      }]
-    },
-    options: {
-      plugins: {
-        legend: { display: false }
-      },
-      scales: {
-        x: {
-          title: { display: true, text: '時間（秒）' },
-          min: 0,
-          max: xMax,
-          ticks: {
-            autoSkip: true,
-            maxTicksLimit: 12
-          }
-        },
-        y: {
-          title: { display: true, text: 'お金（円）' },
-          min: Math.min(...money) - 100,
-          max: 16500
+      currentMoney = lastMoney + slope / 100;
+      for(let i=0; i<10; i++) {
+        if(eventTimes[i] !== null && Math.abs(timeSec - eventTimes[i]) < 0.005) {
+          currentMoney -= costs[i];
         }
       }
+      if (currentMoney >= 16500) {
+        currentMoney = 16500;
+        slope = 0;
+      }
+      seconds.push(timeSec);
+      money.push(currentMoney);
+      lastMoney = currentMoney;
     }
-  });
-}
+
+    window.lastMoneyArray = money;
+
+    const ctx = document.getElementById('moneyChart').getContext('2d');
+    if (moneyChartInstance) {
+      moneyChartInstance.destroy();
+    }
+
+    // X軸下にキャラ名を描画するプラグイン（変更が反映された名前を使用）
+    const labelUnderXAxisPlugin = {
+      id: 'labelUnderXAxis',
+      afterDraw: (chart) => {
+        const c = chart.ctx;
+        const xScale = chart.scales.x;
+        if (!xScale) return;
+        const chartBottom = chart.chartArea.bottom;
+        const chartTop = chart.chartArea.top;
+        c.save();
+        c.font = '12px sans-serif';
+        c.fillStyle = 'red';
+        c.strokeStyle = 'red';
+        c.lineWidth = 2;
+        c.textAlign = 'center';
+        c.textBaseline = 'top';
+        const defaultNames = ["キャラ①","キャラ②","キャラ③","キャラ④","キャラ⑤","キャラ⑥","キャラ⑦","キャラ⑧","キャラ⑨","キャラ⑩"];
+        for (let i = 0; i < 10; i++) {
+          const t = countdownValues[i];
+          if (typeof t === 'number' && !isNaN(t)) {
+            // xScaleの範囲内か確認
+            if (t < xScale.min || t > xScale.max) continue;
+            const x = xScale.getPixelForValue(t);
+            const nameInput = document.getElementById(`charname${i+1}`);
+            const name = nameInput && nameInput.value.trim() !== '' ? nameInput.value : defaultNames[i];
+            // 赤い垂直目盛り（軸に直交）を描画：下端から上向きに 12px
+            const tickHeight = 12;
+            c.beginPath();
+            c.moveTo(x + 0.5, chartBottom + 0.5); // 0.5ピクセル補正でシャープに
+            c.lineTo(x + 0.5, chartBottom - tickHeight + 0.5);
+            c.stroke();
+            // 名前を赤で描画（目盛りの下）
+            const y = chartBottom + 6;
+            c.fillText(name, x, y);
+          }
+        }
+        c.restore();
+      }
+    };
+
+    // Chart.js に線形スケールを使わせるため、データを {x,y} 形式で渡します。
+    const datasetPoints = seconds.map((s, idx) => ({ x: s, y: money[idx] }));
+
+  moneyChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'お金（円）',
+          data: datasetPoints,
+          borderColor: '#0070c0',
+          backgroundColor: 'rgba(0,112,192,0.1)',
+          fill: false,
+          pointRadius: 0,
+          borderWidth: 2,
+          parsing: false
+        }]
+      },
+      options: {
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            title: { display: true, text: '時間（秒）' },
+            min: 0,
+            max: xMax,
+            ticks: {
+              autoSkip: true,
+              maxTicksLimit: 12
+            }
+          },
+          y: {
+            title: { display: true, text: 'お金（円）' },
+            min: Math.min(...money) - 100,
+            max: 16500
+          }
+        },
+        maintainAspectRatio: false,
+        layout: {
+          padding: {
+            bottom: 48
+          }
+        }
+      },
+      plugins: [labelUnderXAxisPlugin]
+    });
+    // 初期レンジを保存（reset 用）
+    window.chartInitialRanges = { x: { min: 0, max: xMax }, y: { min: Math.min(...money) - 100, max: 16500 } };
+    // 初期サイズを保存（サイズリセット用）
+    const container = ctx.canvas.parentNode; // .chart-container
+    if (container) {
+      // 保持するのは実際のピクセルサイズ
+      window.chartInitialSize = { width: container.offsetWidth, height: container.offsetHeight };
+      // canvasをコンテナに合わせて伸縮させる
+      ctx.canvas.style.width = '100%';
+      ctx.canvas.style.height = '100%';
+      // overlay をコンテナサイズに合わせる
+      updateOverlaySize();
+    }
+  }
+
+  // チャートのコンテナを倍率でリサイズする（現在のサイズに対して乗算）
+  function resizeChartByFactor(fw, fh) {
+    const container = document.querySelector('.chart-container');
+    if (!container) return;
+    const canvas = document.getElementById('moneyChart');
+    const curW = container.offsetWidth;
+    const curH = container.offsetHeight;
+    const newW = Math.max(200, Math.round(curW * fw));
+    const newH = Math.max(120, Math.round(curH * fh));
+    container.style.width = newW + 'px';
+    container.style.height = newH + 'px';
+    if (canvas) {
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+    }
+    if (moneyChartInstance) {
+      moneyChartInstance.resize();
+      moneyChartInstance.update();
+      // overlay のサイズも同期
+      updateOverlaySize();
+    }
+  }
+
+  function increaseHeight() { resizeChartByFactor(1, 1.2); }
+  function decreaseHeight() { resizeChartByFactor(1, 0.8); }
+  function resetSize() {
+    const container = document.querySelector('.chart-container');
+    if (!container || !window.chartInitialSize) return;
+    container.style.width = window.chartInitialSize.width + 'px';
+    container.style.height = window.chartInitialSize.height + 'px';
+    const canvas = document.getElementById('moneyChart');
+    if (canvas) { canvas.style.width = '100%'; canvas.style.height = '100%'; }
+    if (moneyChartInstance) { moneyChartInstance.resize(); moneyChartInstance.update(); }
+  }
+
+  // ズーム操作（drawMoneyChart の外で定義）: factor <1 は拡大、>1 は縮小
+  function zoomChartByFactor(factor) {
+    if (!moneyChartInstance) return;
+    const xScale = moneyChartInstance.scales.x;
+    const yScale = moneyChartInstance.scales.y;
+    if (!xScale || !yScale) return;
+    const curMinX = xScale.min;
+    const curMaxX = xScale.max;
+    const curMinY = yScale.min;
+    const curMaxY = yScale.max;
+    const centerX = (curMinX + curMaxX) / 2;
+    const centerY = (curMinY + curMaxY) / 2;
+    const halfRangeX = (curMaxX - curMinX) / 2 * factor;
+    const halfRangeY = (curMaxY - curMinY) / 2 * factor;
+    const newMinX = Math.max(0, centerX - halfRangeX);
+    const newMaxX = Math.max(newMinX + 0.1, centerX + halfRangeX);
+    const newMinY = centerY - halfRangeY;
+    const newMaxY = centerY + halfRangeY;
+    moneyChartInstance.options.scales.x.min = newMinX;
+    moneyChartInstance.options.scales.x.max = newMaxX;
+    moneyChartInstance.options.scales.y.min = newMinY;
+    moneyChartInstance.options.scales.y.max = newMaxY;
+    moneyChartInstance.update('none');
+  }
+
+  function zoomIn() { zoomChartByFactor(0.8); }
+  function zoomOut() { zoomChartByFactor(1.25); }
+  function resetZoom() {
+    if (!moneyChartInstance) return;
+    const xr = window.chartInitialRanges.x;
+    const yr = window.chartInitialRanges.y;
+    moneyChartInstance.options.scales.x.min = xr.min;
+    moneyChartInstance.options.scales.x.max = xr.max;
+    moneyChartInstance.options.scales.y.min = yr.min;
+    moneyChartInstance.options.scales.y.max = yr.max;
+    moneyChartInstance.update();
+  }
+
+  // ボタンイベント登録（1回だけ）
+  if (!window.zoomControlsInitialized) {
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+    if (resetZoomBtn) resetZoomBtn.addEventListener('click', (e)=>{ e.preventDefault(); resetZoom(); });
+    window.zoomControlsInitialized = true;
+  }
+
+  // 拡張: X/Y専用ズームとパン（ドラッグ）機能
+  function zoomChartAxis(factor, axis) {
+    if (!moneyChartInstance) return;
+    const xScale = moneyChartInstance.scales.x;
+    const yScale = moneyChartInstance.scales.y;
+    if (!xScale || !yScale) return;
+    const curMinX = xScale.min;
+    const curMaxX = xScale.max;
+    const curMinY = yScale.min;
+    const curMaxY = yScale.max;
+    const centerX = (curMinX + curMaxX) / 2;
+    const centerY = (curMinY + curMaxY) / 2;
+    if (axis === 'x' || axis === 'both') {
+      const halfRangeX = (curMaxX - curMinX) / 2 * factor;
+      const newMinX = Math.max(0, centerX - halfRangeX);
+      const newMaxX = Math.max(newMinX + 0.1, centerX + halfRangeX);
+      moneyChartInstance.options.scales.x.min = newMinX;
+      moneyChartInstance.options.scales.x.max = newMaxX;
+    }
+    if (axis === 'y' || axis === 'both') {
+      const halfRangeY = (curMaxY - curMinY) / 2 * factor;
+      const newMinY = centerY - halfRangeY;
+      const newMaxY = centerY + halfRangeY;
+      moneyChartInstance.options.scales.y.min = newMinY;
+      moneyChartInstance.options.scales.y.max = newMaxY;
+    }
+    moneyChartInstance.update('none');
+  }
+
+  // 固定倍率での軸別ズーム（f < 1 は拡大、>1 は縮小）
+  function zoomInAxis(axis) { const f = 0.8; zoomChartAxis(f, axis); }
+  function zoomOutAxis(axis) { const f = 1.25; zoomChartAxis(f, axis); }
+
+  // パン（ドラッグで移動） — ピクセル差分で計算し、requestAnimationFrame で間引いて更新する方式に変更
+  (function attachPanHandlers(){
+    const canvas = document.getElementById('moneyChart');
+    if (!canvas || window.panHandlersAttached) return;
+    let isPanning = false;
+    let startPx = 0, startPy = 0;
+    let startMinX = 0, startMaxX = 0, startMinY = 0, startMaxY = 0;
+    let pending = false;
+    let pendingMinX = null, pendingMaxX = null, pendingMinY = null, pendingMaxY = null;
+
+    function getClientPos(evt) {
+      const clientX = evt.clientX !== undefined ? evt.clientX : (evt.touches && evt.touches[0] && evt.touches[0].clientX);
+      const clientY = evt.clientY !== undefined ? evt.clientY : (evt.touches && evt.touches[0] && evt.touches[0].clientY);
+      return { clientX, clientY };
+    }
+
+    function scheduleApply() {
+      if (pending) return;
+      pending = true;
+      requestAnimationFrame(() => {
+        if (pendingMinX !== null) {
+          moneyChartInstance.options.scales.x.min = pendingMinX;
+          moneyChartInstance.options.scales.x.max = pendingMaxX;
+        }
+        if (pendingMinY !== null) {
+          moneyChartInstance.options.scales.y.min = pendingMinY;
+          moneyChartInstance.options.scales.y.max = pendingMaxY;
+        }
+        moneyChartInstance.update('none');
+        // reset pending
+        pending = false;
+        pendingMinX = pendingMaxX = pendingMinY = pendingMaxY = null;
+      });
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (!moneyChartInstance) return;
+      isPanning = true;
+      const rect = canvas.getBoundingClientRect();
+      const { clientX, clientY } = getClientPos(e);
+      startPx = clientX - rect.left;
+      startPy = clientY - rect.top;
+      const xScale = moneyChartInstance.scales.x;
+      const yScale = moneyChartInstance.scales.y;
+      startMinX = xScale.min; startMaxX = xScale.max;
+      startMinY = yScale.min; startMaxY = yScale.max;
+      canvas.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isPanning || !moneyChartInstance) return;
+      const rect = canvas.getBoundingClientRect();
+      const { clientX, clientY } = getClientPos(e);
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const dx = px - startPx; // positive -> right
+      const dy = py - startPy; // positive -> down
+      const chartArea = moneyChartInstance.chartArea || { left: 0, right: rect.width, top: 0, bottom: rect.height };
+      const chartWidth = chartArea.right - chartArea.left;
+      const chartHeight = chartArea.bottom - chartArea.top;
+      const xScale = moneyChartInstance.scales.x;
+      const yScale = moneyChartInstance.scales.y;
+      const curMinX = startMinX;
+      const curMaxX = startMaxX;
+      const curMinY = startMinY;
+      const curMaxY = startMaxY;
+      const valuePerPixelX = (curMaxX - curMinX) / Math.max(1, chartWidth);
+      const valuePerPixelY = (curMaxY - curMinY) / Math.max(1, chartHeight);
+      // Convert pixel movement to value movement (invert X so dragging right moves to earlier times)
+      const valueDeltaX = dx * valuePerPixelX;
+      const valueDeltaY = dy * valuePerPixelY;
+      const newMinX = Math.max(0, curMinX - valueDeltaX);
+      const newMaxX = Math.max(newMinX + 0.01, curMaxX - valueDeltaX);
+      const newMinY = curMinY + valueDeltaY;
+      const newMaxY = curMaxY + valueDeltaY;
+      pendingMinX = newMinX; pendingMaxX = newMaxX; pendingMinY = newMinY; pendingMaxY = newMaxY;
+      scheduleApply();
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isPanning) return;
+      isPanning = false;
+      canvas.style.cursor = 'default';
+    });
+
+    // touch support (single finger pan)
+    canvas.addEventListener('touchstart', (e)=>{
+      if (!moneyChartInstance) return;
+      if (e.touches && e.touches.length===1) {
+        isPanning = true;
+        const rect = canvas.getBoundingClientRect();
+        const { clientX, clientY } = getClientPos(e);
+        startPx = clientX - rect.left;
+        startPy = clientY - rect.top;
+        const xScale = moneyChartInstance.scales.x;
+        const yScale = moneyChartInstance.scales.y;
+        startMinX = xScale.min; startMaxX = xScale.max;
+        startMinY = yScale.min; startMaxY = yScale.max;
+      }
+    });
+    canvas.addEventListener('touchmove', (e)=>{
+      if (!isPanning || !moneyChartInstance) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const { clientX, clientY } = getClientPos(e);
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const dx = px - startPx;
+      const dy = py - startPy;
+      const chartArea = moneyChartInstance.chartArea || { left: 0, right: rect.width, top: 0, bottom: rect.height };
+      const chartWidth = chartArea.right - chartArea.left;
+      const chartHeight = chartArea.bottom - chartArea.top;
+      const curMinX = startMinX;
+      const curMaxX = startMaxX;
+      const curMinY = startMinY;
+      const curMaxY = startMaxY;
+      const valuePerPixelX = (curMaxX - curMinX) / Math.max(1, chartWidth);
+      const valuePerPixelY = (curMaxY - curMinY) / Math.max(1, chartHeight);
+      const valueDeltaX = dx * valuePerPixelX;
+      const valueDeltaY = dy * valuePerPixelY;
+      const newMinX = Math.max(0, curMinX - valueDeltaX);
+      const newMaxX = Math.max(newMinX + 0.01, curMaxX - valueDeltaX);
+      const newMinY = curMinY + valueDeltaY;
+      const newMaxY = curMaxY + valueDeltaY;
+      pendingMinX = newMinX; pendingMaxX = newMaxX; pendingMinY = newMinY; pendingMaxY = newMaxY;
+      scheduleApply();
+    }, { passive:false });
+    canvas.addEventListener('touchend', (e)=>{ isPanning=false; });
+
+    window.panHandlersAttached = true;
+  })();
+
+  // 追加のコントロールイベント
+  const zxIn = document.getElementById('zoomXInBtn');
+  const zxOut = document.getElementById('zoomXOutBtn');
+  const zyIn = document.getElementById('zoomYInBtn');
+  const zyOut = document.getElementById('zoomYOutBtn');
+  if (zxIn) zxIn.addEventListener('click', (e)=>{ e.preventDefault(); zoomInAxis('x'); });
+  if (zxOut) zxOut.addEventListener('click', (e)=>{ e.preventDefault(); zoomOutAxis('x'); });
+  if (zyIn) zyIn.addEventListener('click', (e)=>{ e.preventDefault(); zoomInAxis('y'); });
+  if (zyOut) zyOut.addEventListener('click', (e)=>{ e.preventDefault(); zoomOutAxis('y'); });
+  // サイズ変更ボタンのイベント（幅変更ボタンは削除された）
+  const hInc = document.getElementById('heightIncBtn');
+  const hDec = document.getElementById('heightDecBtn');
+  const resetSizeBtn = document.getElementById('resetSizeBtn');
+  if (hInc) hInc.addEventListener('click', (e)=>{ e.preventDefault(); increaseHeight(); });
+  if (hDec) hDec.addEventListener('click', (e)=>{ e.preventDefault(); decreaseHeight(); });
+  if (resetSizeBtn) resetSizeBtn.addEventListener('click', (e)=>{ e.preventDefault(); resetSize(); });
+
 </script>
 </body>
 </html>
