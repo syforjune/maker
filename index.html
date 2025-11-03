@@ -277,6 +277,8 @@ input[type="number"] {
     <div id="accountDropdown" class="account-dropdown" aria-hidden="true">
       <input type="text" id="accountNameInput" class="box" placeholder="ユーザーネーム">
       <button id="createAccountBtn" class="chart-btn small" disabled>アカウント作成</button>
+      <button id="loginAccountBtn" class="chart-btn small" style="margin-top:6px;">ログイン</button>
+      <button id="logoutAccountBtn" class="chart-btn small" style="display:none; margin-top:6px; background:#c0392b;">ログアウト</button>
       <button id="saveAccountBtn" class="chart-btn small" style="display:none; margin-top:6px;">保存</button>
       <div id="accountInfo" style="margin-top:8px;color:#333;">ID: -</div>
     </div>
@@ -1019,6 +1021,57 @@ let countdownIntervals = Array(10).fill(null);
     // Keep ID system: store a stable ID per user alongside the name
     const STORAGE_LAST_ACCOUNT_ID = 'maker1_last_account_id_v1';
 
+    // Accounts map: id -> name (to support login by ID across multiple saved accounts on the same client)
+    const STORAGE_ACCOUNTS_MAP = 'maker1_accounts_map_v1';
+
+    function getAccountsMap() {
+      try { const raw = localStorage.getItem(STORAGE_ACCOUNTS_MAP); return raw ? JSON.parse(raw) : {}; } catch(e) { return {}; }
+    }
+    function setAccountsMap(m) { try { localStorage.setItem(STORAGE_ACCOUNTS_MAP, JSON.stringify(m)); } catch(e) {} }
+    function registerAccount(id, name) { try { if (!id) return; const m = getAccountsMap(); m[id] = name || ''; setAccountsMap(m); } catch(e) {} }
+
+    // Migrate accounts whose ID starts with '2-' to start with '1-'
+    function migrateAccounts2to1() {
+      if (!confirm("IDが '2-' で始まるアカウントを '1-' に変換します。続行しますか？")) return;
+      try {
+        const accounts = getAccountsMap();
+        const keys = Object.keys(accounts || {});
+        const renames = [];
+        for (const oldId of keys) {
+          if (/^2-/.test(oldId)) {
+            const newId = oldId.replace(/^2-/, '1-');
+            // if newId exists, ask whether to overwrite
+            if (accounts[newId]) {
+              const ok = confirm(`変換先 ID ${newId} は既に存在します。上書きしますか？ (OK=上書き、キャンセル=スキップ)`);
+              if (!ok) continue;
+            }
+            accounts[newId] = accounts[oldId];
+            delete accounts[oldId];
+            // migrate per-account preset key if present (convention: STORAGE_PRESETS_KEY + '_' + id)
+            try {
+              const oldPresetKey = STORAGE_PRESETS_KEY + '_' + oldId;
+              const newPresetKey = STORAGE_PRESETS_KEY + '_' + newId;
+              const raw = localStorage.getItem(oldPresetKey);
+              if (raw !== null) {
+                localStorage.setItem(newPresetKey, raw);
+                localStorage.removeItem(oldPresetKey);
+              }
+            } catch (e) { /* ignore preset migration errors */ }
+            // if currently selected last account id matches, update it
+            try { if (getLastAccountId() === oldId) setLastAccountId(newId); } catch(e) {}
+            renames.push({ old: oldId, new: newId });
+          }
+        }
+        setAccountsMap(accounts);
+        alert('完了: ' + renames.length + ' 件を更新しました\n' + renames.map(r => `${r.old} → ${r.new}`).join('\n'));
+        try { const accountInfo = document.getElementById('accountInfo'); if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {}
+      } catch (e) {
+        console.warn('migrateAccounts2to1 failed', e);
+        alert('変換中にエラーが発生しました。コンソールを確認してください。');
+      }
+    }
+
+
     function getLastAccountId() {
       try { return localStorage.getItem(STORAGE_LAST_ACCOUNT_ID) || ''; } catch(e) { return ''; }
     }
@@ -1103,6 +1156,8 @@ let countdownIntervals = Array(10).fill(null);
             id = generateAccountId();
             setLastAccountId(id);
           }
+          // register mapping id -> name for login lookups
+          try { registerAccount(id, name); } catch(e) {}
         } catch(e) {}
       } catch(e){}
     }
@@ -1269,13 +1324,23 @@ let countdownIntervals = Array(10).fill(null);
       const accountLabel = document.getElementById('accountLabel');
       // initial account label and button visibility
       try {
-        const last = getLastAccountName();
-        if (accountLabel) accountLabel.textContent = last || '';
-        // ensure stored ID follows new format and display it
-        const displayedId = ensureAccountIdFormat() || '-';
-        if (accountInfo) accountInfo.textContent = `ID: ${displayedId}`;
-        if (createAccountBtn) createAccountBtn.style.display = 'none';
-        if (saveAccountBtn) saveAccountBtn.style.display = 'none';
+  const last = getLastAccountName();
+  const hasName = (last || '').trim() !== '';
+  if (accountLabel) accountLabel.textContent = last || '';
+  // ensure stored ID follows new format and display it; if guest (no name) show '-'
+  const displayedId = hasName ? (ensureAccountIdFormat() || '-') : '-';
+  if (accountInfo) accountInfo.textContent = `ID: ${displayedId}`;
+  // show create button when guest, hide when logged in
+  if (createAccountBtn) { createAccountBtn.style.display = hasName ? 'none' : 'inline-block'; createAccountBtn.disabled = hasName; }
+  if (saveAccountBtn) saveAccountBtn.style.display = 'none';
+        // show logout if user has an account, otherwise show login when dropdown opens
+        try {
+          const logoutBtn = document.getElementById('logoutAccountBtn');
+          const loginBtn = document.getElementById('loginAccountBtn');
+          const hasName = (getLastAccountName() || '').trim() !== '';
+          if (logoutBtn) logoutBtn.style.display = hasName ? 'inline-block' : 'none';
+          if (loginBtn) loginBtn.style.display = hasName ? 'none' : 'inline-block';
+        } catch (e) {}
       } catch(e) {}
       if (accountBtn && accountDropdown) {
         accountDropdown.setAttribute('aria-hidden','true');
@@ -1287,6 +1352,16 @@ let countdownIntervals = Array(10).fill(null);
             // prefill last account name (single-account flow)
             try { accountNameInput.value = getLastAccountName() || ''; } catch(e) {}
             try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {}
+            // show login/logout/create buttons according to whether user has an account
+            try {
+              const loginBtn = document.getElementById('loginAccountBtn');
+              const logoutBtn = document.getElementById('logoutAccountBtn');
+              const createBtn = document.getElementById('createAccountBtn');
+              const hasName2 = (getLastAccountName() || '').trim() !== '';
+              if (loginBtn) loginBtn.style.display = hasName2 ? 'none' : 'inline-block';
+              if (logoutBtn) logoutBtn.style.display = hasName2 ? 'inline-block' : 'none';
+              if (createBtn) { createBtn.style.display = hasName2 ? 'none' : 'inline-block'; createBtn.disabled = hasName2; }
+            } catch(e) {}
           }
         });
       }
@@ -1304,9 +1379,99 @@ let countdownIntervals = Array(10).fill(null);
       if (createAccountBtn) {
   // hide unused create button (single-account flow)
   createAccountBtn.style.display = 'none';
-  createAccountBtn.addEventListener('click', (e)=>{ e.preventDefault(); const name = accountNameInput.value.trim(); if (!name) return; setLastAccountName(name); if (accountLabel) accountLabel.textContent = name; try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {} if (saveAccountBtn) saveAccountBtn.style.display = 'none'; alert('アカウントを作成しました'); });
+        createAccountBtn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          const name = accountNameInput.value.trim();
+          if (!name) return;
+          setLastAccountName(name);
+          if (accountLabel) accountLabel.textContent = name;
+          try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {}
+          if (saveAccountBtn) saveAccountBtn.style.display = 'none';
+          // update login/logout/create buttons
+          try {
+            const loginBtn = document.getElementById('loginAccountBtn');
+            const logoutBtn = document.getElementById('logoutAccountBtn');
+            const createBtn = document.getElementById('createAccountBtn');
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (logoutBtn) logoutBtn.style.display = 'inline-block';
+            if (createBtn) { createBtn.style.display = 'none'; createBtn.disabled = true; }
+          } catch(e) {}
+          alert('アカウントを作成しました');
+        });
       }
-  if (saveAccountBtn) saveAccountBtn.addEventListener('click', (e)=>{ e.preventDefault(); const newName = accountNameInput.value.trim(); if (!newName) return; try { setLastAccountName(newName); if (accountLabel) accountLabel.textContent = newName; try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {} saveAccountBtn.style.display = 'none'; alert('ユーザーネームを更新しました'); } catch(err) { console.warn('saveAccount failed', err); } });
+      if (saveAccountBtn) {
+        saveAccountBtn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          const newName = accountNameInput.value.trim();
+          if (!newName) return;
+          try {
+            setLastAccountName(newName);
+            if (accountLabel) accountLabel.textContent = newName;
+            try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {}
+            saveAccountBtn.style.display = 'none';
+            try {
+              const loginBtn = document.getElementById('loginAccountBtn');
+              const logoutBtn = document.getElementById('logoutAccountBtn');
+              if (loginBtn) loginBtn.style.display = 'none';
+              if (logoutBtn) logoutBtn.style.display = 'inline-block';
+            } catch(e) {}
+            alert('ユーザーネームを更新しました');
+          } catch(err) { console.warn('saveAccount failed', err); }
+        });
+      }
+      // login button handler: allow entering an ID to log in to an existing stored account
+      try {
+        const loginBtn = document.getElementById('loginAccountBtn');
+        if (loginBtn) {
+          loginBtn.addEventListener('click', (ev)=>{
+            ev.preventDefault();
+            const entered = prompt('ログインするIDを入力してください (例: 1-3f2a...)');
+            if (!entered) return;
+            const accounts = getAccountsMap();
+            const trimmed = entered.trim();
+            if (accounts && typeof accounts[trimmed] !== 'undefined') {
+              // found: set as current
+              try {
+                const name = accounts[trimmed];
+                setLastAccountId(trimmed);
+                setLastAccountName(name);
+                if (accountLabel) accountLabel.textContent = name;
+                if (accountInfo) accountInfo.textContent = `ID: ${trimmed}`;
+                  // hide login button now that user is logged in
+                  loginBtn.style.display = 'none';
+                  try { const logoutBtn = document.getElementById('logoutAccountBtn'); if (logoutBtn) logoutBtn.style.display = 'inline-block'; } catch(e) {}
+                  try { const createBtn = document.getElementById('createAccountBtn'); if (createBtn) { createBtn.style.display = 'none'; createBtn.disabled = true; } } catch(e) {}
+                  alert('ログインしました');
+              } catch(e) { console.warn('login failed', e); alert('ログインに失敗しました'); }
+            } else {
+              alert('指定のIDは見つかりませんでした');
+            }
+          });
+        }
+      } catch(e) {}
+        // logout handler
+        try {
+          const logoutBtn = document.getElementById('logoutAccountBtn');
+          if (logoutBtn) {
+            logoutBtn.addEventListener('click', (ev)=>{
+              ev.preventDefault();
+              if (!confirm('ログアウトしますか？ (ゲスト状態になります)')) return;
+              try {
+                // clear current account id and name (guest state)
+                setLastAccountId('');
+                setLastAccountName('');
+                // update UI
+                if (accountLabel) accountLabel.textContent = '';
+                if (accountInfo) accountInfo.textContent = 'ID: -';
+                // show login and create, hide logout
+                try { const loginBtn2 = document.getElementById('loginAccountBtn'); if (loginBtn2) loginBtn2.style.display = 'inline-block'; } catch(e) {}
+                try { const createBtn2 = document.getElementById('createAccountBtn'); if (createBtn2) { createBtn2.style.display = 'inline-block'; createBtn2.disabled = false; } } catch(e) {}
+                try { logoutBtn.style.display = 'none'; } catch(e) {}
+                alert('ログアウトしました');
+              } catch(e) { console.warn('logout failed', e); alert('ログアウトに失敗しました'); }
+            });
+          }
+        } catch(e) {}
       document.addEventListener('click', (ev)=>{ const t = ev.target; if (accountDropdown && accountBtn && !accountDropdown.contains(t) && !accountBtn.contains(t)) { accountDropdown.classList.remove('open'); accountDropdown.setAttribute('aria-hidden','true'); } });
     }
 
