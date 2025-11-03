@@ -261,10 +261,28 @@ input[type="number"] {
     height:26px;
     box-sizing:border-box;
   }
+  /* Account button (top-right) */
+  .account-controls { position: absolute; top:8px; right:8px; display:flex; align-items:center; gap:8px; z-index:120; }
+  .account-controls .account-btn { background:#0070c0; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+  .account-dropdown { position:absolute; right:0; top:36px; background:#fff; border:1px solid #ccc; padding:8px; box-shadow:0 6px 18px rgba(0,0,0,0.12); display:none; z-index:130; min-width:220px; }
+  .account-dropdown.open { display:block; }
+  /* stronger selector + !important to override global .box rules */
+  .account-dropdown input#accountNameInput.box { width:220px !important; box-sizing:border-box; margin-bottom:8px; max-width:calc(100vw - 48px) !important; }
   </style>
 </head>
 <body>
+  <div class="account-controls">
+    <span id="accountLabel" style="margin-right:8px; font-weight:600; color:#333;"></span>
+    <button id="accountBtn" class="account-btn">アカウント</button>
+    <div id="accountDropdown" class="account-dropdown" aria-hidden="true">
+      <input type="text" id="accountNameInput" class="box" placeholder="ユーザーネーム">
+      <button id="createAccountBtn" class="chart-btn small" disabled>アカウント作成</button>
+      <button id="saveAccountBtn" class="chart-btn small" style="display:none; margin-top:6px;">保存</button>
+      <div id="accountInfo" style="margin-top:8px;color:#333;">ID: -</div>
+    </div>
+  </div>
   <div class="config-area">
+    <!-- TL / posting UI removed -->
     <div class="preset-row">
       <div class="preset-controls">
   <span id="currentPresetName" class="current-preset">選択中: —</span>
@@ -282,6 +300,7 @@ input[type="number"] {
       <button type="button" class="isabiri-btn" id="isabiriBtn">いさびりヘッド / 逆襲のカオル君</button>
     </div>
   </div>
+  <!-- TL panel (moved into config-area) -->
   <div id="message1">
     <form class="keisan_form" name="keisan_form">
       <div class="input-area">
@@ -605,6 +624,7 @@ input[type="number"] {
       STAGE_LENGTH = Number(stageLengthInput.value) || 0;
       updateStageButtonActive();
     });
+    // initial UI setup will run in initApp()
 
     gakkariBtn.addEventListener("click", function() {
       STAGE_LENGTH = 3600;
@@ -618,8 +638,7 @@ input[type="number"] {
       updateStageButtonActive();
     });
 
-    // 初期表示時にボタン色を設定
-    window.addEventListener("DOMContentLoaded", updateStageButtonActive);
+  // 初期表示時にボタン色を設定 (will be invoked by initApp)
 
     // キャラ名入力欄の値を計算結果ラベルに反映
     function updateResultLabels() {
@@ -793,8 +812,7 @@ input[type="number"] {
         charnameInput.addEventListener("blur", updateResultLabels); // フォーカスが外れた時
       }
     }
-    // 初期表示時にも反映
-    window.addEventListener("DOMContentLoaded", updateResultLabels);
+  // 初期表示時にも反映 (will be invoked by initApp)
 
     let countdownValues = Array(10).fill(null);
 let countdownIntervals = Array(10).fill(null);
@@ -895,8 +913,7 @@ let countdownIntervals = Array(10).fill(null);
       }
     }
 
-    // ensure listeners are attached once DOM ready
-    window.addEventListener('DOMContentLoaded', attachAutoSaveListeners);
+  // ensure listeners are attached once DOM ready (attachAutoSaveListeners will be invoked by initApp)
 
     // Clear saved inputs (remove from localStorage and reset fields)
     function clearSavedInputs() {
@@ -975,6 +992,7 @@ let countdownIntervals = Array(10).fill(null);
   editBtn.className = 'chart-btn small';
   editBtn.addEventListener('click', (e)=>{ e.preventDefault(); editPreset(p.name); });
   right.appendChild(editBtn);
+  // 投稿機能は無効化されました（TL機能削除）
         const delBtn = document.createElement('button');
         delBtn.textContent = '削除';
         delBtn.className = 'chart-btn small';
@@ -984,6 +1002,7 @@ let countdownIntervals = Array(10).fill(null);
         row.appendChild(right);
         container.appendChild(row);
       });
+      // 投稿機能は削除されているため、ここでの表示調整は不要
     }
 
     // Update the displayed current preset name (left of input)
@@ -992,6 +1011,100 @@ let countdownIntervals = Array(10).fill(null);
       if (!el) return;
       if (name && name.trim()) el.textContent = `選択中: ${name}`;
       else el.textContent = '選択中: —';
+    }
+
+    // --- Account handling (simplified: single stored name) ---
+    const STORAGE_LAST_ACCOUNT = 'maker1_last_account_v1';
+
+    // Keep ID system: store a stable ID per user alongside the name
+    const STORAGE_LAST_ACCOUNT_ID = 'maker1_last_account_id_v1';
+
+    function getLastAccountId() {
+      try { return localStorage.getItem(STORAGE_LAST_ACCOUNT_ID) || ''; } catch(e) { return ''; }
+    }
+    function setLastAccountId(id) {
+      try { localStorage.setItem(STORAGE_LAST_ACCOUNT_ID, id); } catch(e) {}
+    }
+
+    // account counter key: keeps track of how many accounts have been created on this client
+    const STORAGE_ACCOUNT_COUNTER = 'maker1_account_counter_v1';
+
+    function getNextAccountNumber() {
+      try {
+        const raw = localStorage.getItem(STORAGE_ACCOUNT_COUNTER) || '0';
+        let n = parseInt(raw, 10);
+        if (!isFinite(n)) n = 0;
+        n = n + 1;
+        localStorage.setItem(STORAGE_ACCOUNT_COUNTER, String(n));
+        return n;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // generate a compact reasonably-unique id (local-only)
+    // Prefix the id with a sequential account number so the id begins with the
+    // "何番目の作成か" information, zero-padded to 4 digits (e.g. 0001-3f2a...).
+    function generateAccountId() {
+      let hex = null;
+      try {
+        if (window.crypto && crypto.getRandomValues) {
+          const arr = new Uint8Array(8);
+          crypto.getRandomValues(arr);
+          hex = Array.from(arr).map(n => ('0' + n.toString(16)).slice(-2)).join('');
+        }
+      } catch (e) { hex = null; }
+      if (!hex) {
+        hex = (Date.now().toString(36) + Math.floor(Math.random()*100000).toString(36));
+      }
+      // get sequential number and prefix
+      const seq = getNextAccountNumber();
+      // use plain decimal sequence without zero-padding (e.g. 1-..., 10-...)
+      const seqStr = (seq && isFinite(seq)) ? String(seq) : '0';
+      return `${seqStr}-${hex}`;
+    }
+
+    // Ensure any existing stored account ID follows the new format (starts with a decimal seq and '-')
+    // If it's missing or in an old format, generate a new prefixed ID and persist it.
+    function ensureAccountIdFormat() {
+      try {
+        const cur = getLastAccountId();
+        // if absent but name exists, create one
+        if (!cur || cur.trim() === '') {
+          const name = getLastAccountName();
+          if (name && name.trim() !== '') {
+            const newid = generateAccountId();
+            setLastAccountId(newid);
+            return newid;
+          }
+          return '';
+        }
+        // if already starts with digits- then assume it's new-format
+        if (/^\d+-/.test(cur)) return cur;
+        // otherwise convert: generate a new prefixed id and store it
+        const newid = generateAccountId();
+        setLastAccountId(newid);
+        return newid;
+      } catch (e) {
+        return getLastAccountId() || '';
+      }
+    }
+
+    function getLastAccountName() {
+      try { return localStorage.getItem(STORAGE_LAST_ACCOUNT) || ''; } catch(e){ return ''; }
+    }
+    function setLastAccountName(name) {
+      try {
+        localStorage.setItem(STORAGE_LAST_ACCOUNT, name);
+        // ensure an ID exists for this user (preserve existing if present)
+        try {
+          let id = getLastAccountId();
+          if (!id) {
+            id = generateAccountId();
+            setLastAccountId(id);
+          }
+        } catch(e) {}
+      } catch(e){}
     }
 
     function savePreset(name) {
@@ -1035,6 +1148,8 @@ let countdownIntervals = Array(10).fill(null);
       } catch (e) {}
       alert('プリセットを保存しました');
     }
+
+    // TL / 投稿機能は削除されました
 
     function loadPreset(name) {
       const presets = getPresets();
@@ -1106,9 +1221,17 @@ let countdownIntervals = Array(10).fill(null);
       alert('プリセット名を変更しました');
     }
 
+    // TL / posting code removed per user request
+
     // wire preset UI events after DOM (top-right controls)
-    window.addEventListener('DOMContentLoaded', () => {
+    function initApp() {
+      // existing single-entry initialization calls
+      try { updateStageButtonActive(); } catch(e) {}
+      try { updateResultLabels(); } catch(e) {}
+      try { loadInputsFromLocalStorage(); } catch(e) {}
+      try { attachAutoSaveListeners(); } catch(e) {}
       renderPresetList();
+      // TL / remote-post fetching removed
       const saveBtnTop = document.getElementById('savePresetBtnTop');
       const nameInputTop = document.getElementById('presetNameInputTop');
       const clearTop = document.getElementById('clearSavedBtnTop');
@@ -1136,7 +1259,59 @@ let countdownIntervals = Array(10).fill(null);
           }
         });
       }
-    });
+      // Account dropdown wiring (top-right)
+      const accountBtn = document.getElementById('accountBtn');
+      const accountDropdown = document.getElementById('accountDropdown');
+      const accountNameInput = document.getElementById('accountNameInput');
+      const createAccountBtn = document.getElementById('createAccountBtn');
+      const saveAccountBtn = document.getElementById('saveAccountBtn');
+      const accountInfo = document.getElementById('accountInfo');
+      const accountLabel = document.getElementById('accountLabel');
+      // initial account label and button visibility
+      try {
+        const last = getLastAccountName();
+        if (accountLabel) accountLabel.textContent = last || '';
+        // ensure stored ID follows new format and display it
+        const displayedId = ensureAccountIdFormat() || '-';
+        if (accountInfo) accountInfo.textContent = `ID: ${displayedId}`;
+        if (createAccountBtn) createAccountBtn.style.display = 'none';
+        if (saveAccountBtn) saveAccountBtn.style.display = 'none';
+      } catch(e) {}
+      if (accountBtn && accountDropdown) {
+        accountDropdown.setAttribute('aria-hidden','true');
+        accountBtn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          const open = accountDropdown.classList.toggle('open');
+          accountDropdown.setAttribute('aria-hidden', String(!open));
+          if (open) {
+            // prefill last account name (single-account flow)
+            try { accountNameInput.value = getLastAccountName() || ''; } catch(e) {}
+            try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {}
+          }
+        });
+      }
+      // simplified account input: single stored name (show Save when changed)
+      if (accountNameInput) accountNameInput.addEventListener('input', ()=>{
+        try {
+          const val = accountNameInput.value ? accountNameInput.value.trim() : '';
+          const last = getLastAccountName();
+          if (saveAccountBtn) {
+            if (val && val !== last) { saveAccountBtn.style.display = 'inline-block'; saveAccountBtn.disabled = false; }
+            else saveAccountBtn.style.display = 'none';
+          }
+        } catch(e) {}
+      });
+      if (createAccountBtn) {
+  // hide unused create button (single-account flow)
+  createAccountBtn.style.display = 'none';
+  createAccountBtn.addEventListener('click', (e)=>{ e.preventDefault(); const name = accountNameInput.value.trim(); if (!name) return; setLastAccountName(name); if (accountLabel) accountLabel.textContent = name; try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {} if (saveAccountBtn) saveAccountBtn.style.display = 'none'; alert('アカウントを作成しました'); });
+      }
+  if (saveAccountBtn) saveAccountBtn.addEventListener('click', (e)=>{ e.preventDefault(); const newName = accountNameInput.value.trim(); if (!newName) return; try { setLastAccountName(newName); if (accountLabel) accountLabel.textContent = newName; try { if (accountInfo) accountInfo.textContent = `ID: ${getLastAccountId() || '-'}`; } catch(e) {} saveAccountBtn.style.display = 'none'; alert('ユーザーネームを更新しました'); } catch(err) { console.warn('saveAccount failed', err); } });
+      document.addEventListener('click', (ev)=>{ const t = ev.target; if (accountDropdown && accountBtn && !accountDropdown.contains(t) && !accountBtn.contains(t)) { accountDropdown.classList.remove('open'); accountDropdown.setAttribute('aria-hidden','true'); } });
+    }
+
+    // single DOMContentLoaded entrypoint
+    window.addEventListener('DOMContentLoaded', initApp);
 
     function calc() {
         const formData = document.forms.keisan_form;
